@@ -1,0 +1,16 @@
+[trading212]
+# Bare token (most common): just your API key from T212 Settings → API
+api_key = "your-trading212-api-key-here"
+# Optional: only needed if your account uses a key+secret pair
+# api_secret = "your-trading212-secret-here"
+
+[binance]
+api_key    = "your-binance-api-key-here"
+api_secret = "your-binance-secret-here"
+
+[app]
+port = 7788
+
+[ai]
+model  = "claude-sonnet-4-6"
+effort = "high"

@@ -1,0 +1,41 @@
+{
+    "name": "alex-financial-screener",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "dev:server": "tsx watch src/server/index.ts",
+        "dev:client": "vite",
+        "build": "vite build",
+        "start": "tsx src/server/index.ts",
+        "lint": "biome check .",
+        "format": "biome format --write ."
+    },
+    "dependencies": {
+        "@fastify/cors": "^10",
+        "@fastify/static": "^8",
+        "@tanstack/react-query": "^5",
+        "better-sqlite3": "^12",
+        "chart.js": "^4",
+        "fastify": "^5",
+        "open": "^10",
+        "react": "^19",
+        "react-chartjs-2": "^5",
+        "react-dom": "^19",
+        "smol-toml": "^1",
+        "undici": "^7",
+        "zustand": "^5"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2",
+        "@types/better-sqlite3": "^7",
+        "@types/node": "^22",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "@vitejs/plugin-react-swc": "^3",
+        "sass": "^1",
+        "tsx": "^4",
+        "typescript": "^5",
+        "vite": "^6"
+    }
+}
