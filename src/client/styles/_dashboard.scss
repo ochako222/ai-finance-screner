@@ -4,7 +4,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 // ── Header ──────────────────────────────────────
@@ -77,15 +77,26 @@
     }
 }
 
-// ── Main grid ───────────────────────────────────
-.dashboard__grid {
+// ── Row 2: side-by-side charts ───────────────────
+.dashboard__charts {
     display: grid;
-    grid-template-columns: 1fr 1fr 320px;
+    grid-template-columns: 1fr 1fr;
     gap: 12px;
-    padding: 12px 24px 20px;
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
+    padding: 12px 24px 0;
+    flex-shrink: 0;
+}
+
+// ── Rows 3 & 4: full-width tables ────────────────
+.dashboard__table {
+    padding: 12px 24px 0;
+    flex-shrink: 0;
+
+    &:last-child { padding-bottom: 20px; }
+
+    .panel {
+        width: 100%;
+        overflow-x: auto;
+    }
 }
 
 .panel {
@@ -97,8 +108,9 @@
     min-height: 0;
 }
 
-// ── Allocation chart ────────────────────────────
-.allocation-chart {
+// ── Allocation chart & Dynamics chart ───────────
+.allocation-chart,
+.dynamics-chart {
     background: $surface;
     border: 1px solid $border;
     border-radius: $radius;
@@ -109,7 +121,7 @@
     min-height: 0;
     overflow-y: auto;
 
-    canvas { max-height: 260px; }
+    canvas { max-height: 260px; width: 100% !important; }
 }
 
 // ── Error / loading states ──────────────────────

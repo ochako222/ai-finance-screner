@@ -40,7 +40,13 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| Principle | Gate question | Status |
+|-----------|--------------|--------|
+| I. Code Quality & Type Safety | Are all new types defined in `src/client/support/types.ts` or server interfaces? Does Biome pass? | [ ] |
+| II. Testing Standards | If tests requested: are tests written before implementation? Are connectors integration-tested in isolation? | [ ] |
+| III. UX Consistency | Are loading/error/empty states handled? Are currency values locale-formatted? Are SCSS variables used? | [ ] |
+| IV. Performance & Reliability | Are rate limits respected (T212: 1req/5s account, 1req/1s positions)? Is cache used as primary read path? | [ ] |
+| V. Layered Architecture | Does the feature stay in the correct layer? Is all AI prompt text in `src/server/prompts/index.ts`? | [ ] |
 
 ## Project Structure
 

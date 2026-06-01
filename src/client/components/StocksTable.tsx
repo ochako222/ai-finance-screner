@@ -4,8 +4,12 @@ interface Props {
     positions: T212Position[];
 }
 
-function fmtNum(n: number) {
-    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmtPln(n: number) {
+    return n.toLocaleString('pl-PL', {
+        style: 'currency',
+        currency: 'PLN',
+        maximumFractionDigits: 2
+    });
 }
 
 export default function StocksTable({ positions }: Props) {
@@ -39,13 +43,13 @@ export default function StocksTable({ positions }: Props) {
                         <tr key={pos.ticker}>
                             <td style={{ fontWeight: 500 }}>{pos.ticker.split('_')[0]}</td>
                             <td>{pos.quantity}</td>
-                            <td>{fmtNum(pos.averagePrice)}</td>
-                            <td>{fmtNum(pos.currentPrice)}</td>
+                            <td>{fmtPln(pos.averagePrice)}</td>
+                            <td>{fmtPln(pos.currentPrice)}</td>
                             <td className={pos.ppl >= 0 ? 'positive' : 'negative'}>
                                 {pos.ppl >= 0 ? '+' : ''}
-                                {fmtNum(pos.ppl)}
+                                {fmtPln(pos.ppl)}
                             </td>
-                            <td>{fmtNum(pos.value)}</td>
+                            <td>{fmtPln(pos.value)}</td>
                         </tr>
                     ))}
                 </tbody>

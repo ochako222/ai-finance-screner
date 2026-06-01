@@ -21,8 +21,53 @@ export function getDb(): Database.Database {
         );
         CREATE INDEX IF NOT EXISTS idx_snapshots_source_time
             ON snapshots (source, captured_at DESC);
+
+        CREATE TABLE IF NOT EXISTS portfolio_history (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            captured_at   TEXT NOT NULL,
+            total_pln     REAL NOT NULL,
+            total_usd     REAL,
+            exchange_rate REAL
+        );
+        CREATE INDEX IF NOT EXISTS idx_history_time ON portfolio_history (captured_at DESC);
     `);
     return _db;
+}
+
+export function savePortfolioHistory(
+    totalPln: number,
+    totalUsd: number | null,
+    exchangeRate: number | null
+): void {
+    getDb()
+        .prepare(
+            'INSERT INTO portfolio_history (captured_at, total_pln, total_usd, exchange_rate) VALUES (?, ?, ?, ?)'
+        )
+        .run(new Date().toISOString(), totalPln, totalUsd, exchangeRate);
+}
+
+export function loadPortfolioHistory(): {
+    capturedAt: string;
+    totalPln: number;
+    totalUsd: number | null;
+    exchangeRate: number | null;
+}[] {
+    const rows = getDb()
+        .prepare(
+            'SELECT captured_at, total_pln, total_usd, exchange_rate FROM portfolio_history ORDER BY captured_at ASC'
+        )
+        .all() as {
+        captured_at: string;
+        total_pln: number;
+        total_usd: number | null;
+        exchange_rate: number | null;
+    }[];
+    return rows.map((r) => ({
+        capturedAt: r.captured_at,
+        totalPln: r.total_pln,
+        totalUsd: r.total_usd,
+        exchangeRate: r.exchange_rate
+    }));
 }
 
 export function saveSnapshot(source: 'trading212' | 'binance', payload: unknown): void {
@@ -39,7 +84,9 @@ export interface SnapshotRow {
 export function loadLatestSnapshot(): {
     trading212: any;
     binance: any;
-    totalUsd: number;
+    totalPln: number;
+    totalUsd: number | null;
+    exchangeRate: number | null;
     capturedAt: string;
 } | null {
     const db = getDb();
@@ -53,7 +100,20 @@ export function loadLatestSnapshot(): {
 
     const t212Data = JSON.parse(t212.payload);
     const binanceData = binance ? JSON.parse(binance.payload) : { assets: [], totalUsd: 0 };
-    const totalUsd = (t212Data.summary?.total ?? 0) + (binanceData.totalUsd ?? 0);
+    const totalPln = t212Data.summary?.total ?? 0;
 
-    return { trading212: t212Data, binance: binanceData, totalUsd, capturedAt: t212.captured_at };
+    const histRow = db
+        .prepare(
+            'SELECT total_usd, exchange_rate FROM portfolio_history ORDER BY captured_at DESC LIMIT 1'
+        )
+        .get() as { total_usd: number | null; exchange_rate: number | null } | undefined;
+
+    return {
+        trading212: t212Data,
+        binance: binanceData,
+        totalPln,
+        totalUsd: histRow?.total_usd ?? null,
+        exchangeRate: histRow?.exchange_rate ?? null,
+        capturedAt: t212.captured_at
+    };
 }

@@ -35,15 +35,26 @@ export interface Trading212Data {
 export interface PortfolioSnapshot {
     trading212: Trading212Data;
     binance: BinanceData;
-    totalUsd: number;
+    totalPln: number;
+    totalUsd: number | null;
+    exchangeRate: number | null;
     capturedAt: string;
 }
 
 export interface SyncResult {
     ok: boolean;
     positions: number;
-    totalUsd: number;
-    errors: { trading212: string | null; binance: string | null };
+    totalPln: number;
+    totalUsd: number | null;
+    exchangeRate: number | null;
+    errors: { trading212: string | null; binance: string | null; exchangeRate: string | null };
+}
+
+export interface PortfolioHistoryPoint {
+    capturedAt: string;
+    totalPln: number;
+    totalUsd: number | null;
+    exchangeRate: number | null;
 }
 
 export interface AnalysisMeta {

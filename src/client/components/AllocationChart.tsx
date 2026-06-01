@@ -72,8 +72,13 @@ export default function AllocationChart({ data }: Props) {
                         tooltip: {
                             callbacks: {
                                 label: (ctx) => {
+                                    const val = Number(ctx.raw).toLocaleString('pl-PL', {
+                                        style: 'currency',
+                                        currency: 'PLN',
+                                        maximumFractionDigits: 2
+                                    });
                                     const pct = ((Number(ctx.raw) / total) * 100).toFixed(1);
-                                    return ` $${Number(ctx.raw).toFixed(2)} (${pct}%)`;
+                                    return ` ${val} (${pct}%)`;
                                 }
                             }
                         }
