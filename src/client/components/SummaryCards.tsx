@@ -20,38 +20,82 @@ function fmtUsd(n: number) {
     });
 }
 
+function isStale(capturedAt: string): boolean {
+    return Date.now() - new Date(capturedAt).getTime() > 60 * 60 * 1000;
+}
+
 export default function SummaryCards({ data }: Props) {
-    const { trading212: t212, binance, totalPln, totalUsd } = data;
-    const pnl = t212.summary.result;
-    const pnlPct =
-        t212.summary.invested > 0 ? ((pnl / t212.summary.invested) * 100).toFixed(2) : '0.00';
+    const { trading212: t212, totalPln, totalUsd, capturedAt, investedPln, pnlPln, pnlPct } = data;
+    const stale = isStale(capturedAt);
+
+    const cash = t212.summary.cash;
+    const currentlyInvested = t212.summary.invested;
+    const unrealizedPnl = t212.summary.result;
+    const unrealizedPct = currentlyInvested > 0 ? (unrealizedPnl / currentlyInvested) * 100 : null;
 
     return (
-        <div className="summary-cards">
-            <div className="card">
-                <div className="card__label">Total Portfolio</div>
+        <div className={`summary-cards${stale ? ' summary-cards--stale' : ''}`}>
+            {/* ── Row 1: bottom line ──────────────────────────── */}
+            <div className="card card--primary">
+                <div
+                    className="card__label"
+                    title="Net deposits − withdrawals on your trading account."
+                >
+                    Deposited
+                </div>
+                <div className="card__value">{fmtPln(investedPln)}</div>
+                {stale && <div className="card__stale">stale</div>}
+            </div>
+
+            <div className="card card--primary">
+                <div className="card__label">Portfolio Value</div>
                 <div className="card__value">{fmtPln(totalPln)}</div>
                 <div className="card__sub">
                     {totalUsd != null ? `≈ ${fmtUsd(totalUsd)}` : 'Rate unavailable'}
                 </div>
             </div>
-            <div className="card">
+
+            <div className="card card--primary">
                 <div className="card__label">Total P&amp;L</div>
-                <div className={`card__value ${pnl >= 0 ? 'positive' : 'negative'}`}>
-                    {pnl >= 0 ? '+' : ''}
-                    {fmtPln(pnl)}
+                <div className={`card__value ${pnlPln >= 0 ? 'positive' : 'negative'}`}>
+                    {pnlPln >= 0 ? '+' : ''}
+                    {fmtPln(pnlPln)}
                 </div>
-                <div className="card__sub">{pnlPct}%</div>
+                <div className={`card__sub ${pnlPln >= 0 ? 'positive' : 'negative'}`}>
+                    {pnlPct !== null ? `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%` : '—'}
+                </div>
             </div>
-            <div className="card">
-                <div className="card__label">Stocks (T212)</div>
-                <div className="card__value">{fmtPln(t212.summary.total)}</div>
+
+            {/* ── Row 2: composition ──────────────────────────── */}
+            <div className="card card--sub">
+                <div className="card__label">Cash</div>
+                <div className="card__value card__value--sm">{fmtPln(cash)}</div>
+                <div className="card__sub">free to trade</div>
+            </div>
+
+            <div className="card card--sub">
+                <div className="card__label" title="Cost basis of your currently open positions.">
+                    Currently Invested
+                </div>
+                <div className="card__value card__value--sm">{fmtPln(currentlyInvested)}</div>
                 <div className="card__sub">{t212.positions.length} positions</div>
             </div>
-            <div className="card">
-                <div className="card__label">Crypto (Binance)</div>
-                <div className="card__value">{fmtUsd(binance.totalUsd)}</div>
-                <div className="card__sub">{binance.assets.length} assets</div>
+
+            <div className="card card--sub">
+                <div className="card__label">Unrealized P&amp;L</div>
+                <div
+                    className={`card__value card__value--sm ${
+                        unrealizedPnl >= 0 ? 'positive' : 'negative'
+                    }`}
+                >
+                    {unrealizedPnl >= 0 ? '+' : ''}
+                    {fmtPln(unrealizedPnl)}
+                </div>
+                <div className={`card__sub ${unrealizedPnl >= 0 ? 'positive' : 'negative'}`}>
+                    {unrealizedPct !== null
+                        ? `${unrealizedPct >= 0 ? '+' : ''}${unrealizedPct.toFixed(2)}%`
+                        : '—'}
+                </div>
             </div>
         </div>
     );

@@ -9,7 +9,8 @@
         "build": "vite build",
         "start": "tsx src/server/index.ts",
         "lint": "biome check .",
-        "format": "biome format --write ."
+        "format": "biome format --write .",
+        "test": "vitest run --config vitest.config.ts"
     },
     "dependencies": {
         "@fastify/cors": "^10",
@@ -37,6 +38,7 @@
         "sass": "^1",
         "tsx": "^4",
         "typescript": "^5",
-        "vite": "^6"
+        "vite": "^6",
+        "vitest": "^4.1.8"
     }
 }

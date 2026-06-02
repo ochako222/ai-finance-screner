@@ -1,5 +1,6 @@
 import { fetch } from 'undici';
 import { loadConfig } from '../config.js';
+import type { CashFlow } from '../database.js';
 
 export interface T212Summary {
     cash: number;
@@ -56,4 +57,54 @@ export async function fetchT212(): Promise<{ summary: T212Summary; positions: T2
     }));
 
     return { summary, positions };
+}
+
+export async function fetchT212CashFlows(): Promise<CashFlow[]> {
+    const { api_key, api_secret } = loadConfig().trading212;
+    const authHeader = api_secret
+        ? `Basic ${Buffer.from(`${api_key}:${api_secret}`).toString('base64')}`
+        : api_key;
+    const headers = { Authorization: authHeader };
+
+    const results: CashFlow[] = [];
+    let cursor: string | null = null;
+
+    // Fetch all pages; T212 returns max 50 items per page with cursor pagination.
+    do {
+        const url = new URL(`${BASE}/history/transactions`);
+        url.searchParams.set('limit', '50');
+        if (cursor) url.searchParams.set('cursor', cursor);
+
+        const res = await fetch(url.toString(), { headers });
+        if (!res.ok) throw new Error(`T212 history/transactions: HTTP ${res.status}`);
+        const data = (await res.json()) as { items: any[]; nextPagePath?: string };
+
+        for (const item of data.items ?? []) {
+            const type: string = item.type ?? '';
+            if (type !== 'DEPOSIT' && type !== 'WITHDRAWAL') continue;
+
+            const rawAmount: number = item.amount ?? 0;
+            // Normalise: deposits positive, withdrawals negative.
+            const amount = type === 'WITHDRAWAL' ? -Math.abs(rawAmount) : Math.abs(rawAmount);
+
+            results.push({
+                id: String(item.reference ?? item.transferId ?? `${type}-${item.dateTime}`),
+                dateTime: item.dateTime ?? new Date().toISOString(),
+                type: type as 'DEPOSIT' | 'WITHDRAWAL',
+                amount,
+                currency: item.currency ?? 'PLN'
+            });
+        }
+
+        // nextPagePath is like "/api/v0/history/transactions?cursor=abc123"
+        const next: string | undefined = data.nextPagePath;
+        if (next) {
+            const parsed = new URL(next, 'https://live.trading212.com');
+            cursor = parsed.searchParams.get('cursor');
+        } else {
+            cursor = null;
+        }
+    } while (cursor);
+
+    return results;
 }

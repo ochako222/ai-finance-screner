@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { fetchBinance } from '../connectors/binance.js';
 import { fetchPlnUsdRate } from '../connectors/exchangeRate.js';
-import { fetchT212 } from '../connectors/trading212.js';
+import { fetchT212, fetchT212CashFlows } from '../connectors/trading212.js';
 import { fetchSectors } from '../connectors/yahoo.js';
 import {
+    getNetContributedCapital,
     missingSectorTickers,
+    saveCashFlows,
     savePortfolioHistory,
     saveSector,
     saveSnapshot
@@ -46,13 +48,32 @@ export async function syncRoutes(fastify: FastifyInstance): Promise<void> {
                     fastify.log.warn(`Sector fetch failed: ${err}`);
                 }
             }
+
+            try {
+                await new Promise((r) => setTimeout(r, 1100));
+                const cashFlows = await fetchT212CashFlows();
+                saveCashFlows(cashFlows);
+                const nonPln = [
+                    ...new Set(cashFlows.filter((f) => f.currency !== 'PLN').map((f) => f.currency))
+                ];
+                if (nonPln.length > 0) {
+                    fastify.log.warn(
+                        `Cash flows contain non-PLN currencies: ${nonPln.join(', ')} — FX conversion not yet applied`
+                    );
+                }
+                fastify.log.info(`Cash flows synced: ${cashFlows.length} rows`);
+            } catch (err) {
+                fastify.log.error(`Cash flow sync failed: ${err}`);
+            }
         }
         saveSnapshot('binance', binanceData);
 
         const totalPln = t212Data?.summary.total ?? 0;
         const totalUsd = exchangeRate != null ? totalPln / exchangeRate : null;
+        const { amountPln: investedPln } = getNetContributedCapital();
+        const pnlPln = totalPln - investedPln;
 
-        savePortfolioHistory(totalPln, totalUsd, exchangeRate);
+        savePortfolioHistory(totalPln, totalUsd, exchangeRate, investedPln, pnlPln);
 
         return reply.send({
             ok: true,
