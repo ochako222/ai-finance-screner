@@ -13,6 +13,7 @@ export interface T212Position {
     currentPrice: number;
     ppl: number;
     value: number;
+    sector?: string | null;
 }
 
 export interface BinanceAsset {

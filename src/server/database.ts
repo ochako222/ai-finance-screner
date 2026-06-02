@@ -1,9 +1,8 @@
 import { mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 
-const DB_DIR = join(homedir(), '.local', 'share', 'alex-financial-screener');
+const DB_DIR = join(import.meta.dirname, '..', '..', 'data');
 const DB_PATH = join(DB_DIR, 'portfolio.db');
 
 let _db: Database.Database | null = null;
@@ -30,6 +29,12 @@ export function getDb(): Database.Database {
             exchange_rate REAL
         );
         CREATE INDEX IF NOT EXISTS idx_history_time ON portfolio_history (captured_at DESC);
+
+        CREATE TABLE IF NOT EXISTS instrument_sectors (
+            ticker     TEXT PRIMARY KEY,
+            sector     TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
     `);
     return _db;
 }
@@ -79,6 +84,31 @@ export function saveSnapshot(source: 'trading212' | 'binance', payload: unknown)
 export interface SnapshotRow {
     payload: string;
     captured_at: string;
+}
+
+export function saveSector(ticker: string, sector: string): void {
+    getDb()
+        .prepare(
+            'INSERT INTO instrument_sectors (ticker, sector, updated_at) VALUES (?, ?, ?) ON CONFLICT(ticker) DO UPDATE SET sector = excluded.sector, updated_at = excluded.updated_at'
+        )
+        .run(ticker, sector, new Date().toISOString());
+}
+
+export function loadSectors(tickers: string[]): Record<string, string> {
+    if (tickers.length === 0) return {};
+    const placeholders = tickers.map(() => '?').join(', ');
+    const rows = getDb()
+        .prepare(`SELECT ticker, sector FROM instrument_sectors WHERE ticker IN (${placeholders})`)
+        .all(...tickers) as { ticker: string; sector: string }[];
+    const map: Record<string, string> = {};
+    for (const row of rows) map[row.ticker] = row.sector;
+    return map;
+}
+
+export function missingSectorTickers(tickers: string[]): string[] {
+    if (tickers.length === 0) return [];
+    const existing = loadSectors(tickers);
+    return tickers.filter((t) => !(t in existing));
 }
 
 export function loadLatestSnapshot(): {

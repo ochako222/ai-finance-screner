@@ -2,7 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { fetchBinance } from '../connectors/binance.js';
 import { fetchPlnUsdRate } from '../connectors/exchangeRate.js';
 import { fetchT212 } from '../connectors/trading212.js';
-import { savePortfolioHistory, saveSnapshot } from '../database.js';
+import { fetchSectors } from '../connectors/yahoo.js';
+import {
+    missingSectorTickers,
+    savePortfolioHistory,
+    saveSector,
+    saveSnapshot
+} from '../database.js';
 
 export async function syncRoutes(fastify: FastifyInstance): Promise<void> {
     fastify.post('/api/sync', async (_req, reply) => {
@@ -26,7 +32,21 @@ export async function syncRoutes(fastify: FastifyInstance): Promise<void> {
             fastify.log.warn(`Exchange rate fetch failed: ${rateResult.reason}`);
         }
 
-        if (t212Data) saveSnapshot('trading212', t212Data);
+        if (t212Data) {
+            saveSnapshot('trading212', t212Data);
+
+            const missing = missingSectorTickers(t212Data.positions.map((p) => p.ticker));
+            if (missing.length > 0) {
+                try {
+                    const sectors = await fetchSectors(missing);
+                    for (const [ticker, sector] of Object.entries(sectors)) {
+                        saveSector(ticker, sector);
+                    }
+                } catch (err) {
+                    fastify.log.warn(`Sector fetch failed: ${err}`);
+                }
+            }
+        }
         saveSnapshot('binance', binanceData);
 
         const totalPln = t212Data?.summary.total ?? 0;

@@ -143,6 +143,12 @@
     color: $text-muted;
 }
 
+// ── Stocks table ────────────────────────────────
+.sector-cell {
+    color: $text-muted;
+    font-size: 13px;
+}
+
 // ── Binance stub notice ─────────────────────────
 .stub-notice {
     padding: 20px;

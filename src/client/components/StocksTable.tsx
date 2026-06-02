@@ -31,6 +31,7 @@ export default function StocksTable({ positions }: Props) {
                 <thead>
                     <tr>
                         <th>Ticker</th>
+                        <th>Sector</th>
                         <th>Qty</th>
                         <th>Avg Price</th>
                         <th>Current</th>
@@ -42,6 +43,7 @@ export default function StocksTable({ positions }: Props) {
                     {sorted.map((pos) => (
                         <tr key={pos.ticker}>
                             <td style={{ fontWeight: 500 }}>{pos.ticker.split('_')[0]}</td>
+                            <td className="sector-cell">{pos.sector ?? '—'}</td>
                             <td>{pos.quantity}</td>
                             <td>{fmtPln(pos.averagePrice)}</td>
                             <td>{fmtPln(pos.currentPrice)}</td>

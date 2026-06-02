@@ -16,6 +16,7 @@ export interface T212Position {
     currentPrice: number;
     ppl: number;
     value: number;
+    sector?: string;
 }
 
 const BASE = 'https://live.trading212.com/api/v0';
