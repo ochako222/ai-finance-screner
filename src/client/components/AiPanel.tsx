@@ -31,7 +31,7 @@ export default function AiPanel() {
             esRef.current?.close();
             esRef.current = null;
         };
-    }, [isPanelOpen]);
+    }, [isPanelOpen, setAnalyzing, setAnalysisText, setAnalysisMeta]);
 
     useEffect(() => {
         if (!isPanelOpen) return;

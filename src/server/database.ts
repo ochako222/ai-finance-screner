@@ -26,7 +26,9 @@ export function getDb(): Database.Database {
             captured_at   TEXT NOT NULL,
             total_pln     REAL NOT NULL,
             total_usd     REAL,
-            exchange_rate REAL
+            exchange_rate REAL,
+            invested_pln  REAL,
+            pnl_pln       REAL
         );
         CREATE INDEX IF NOT EXISTS idx_history_time ON portfolio_history (captured_at DESC);
 
@@ -35,6 +37,16 @@ export function getDb(): Database.Database {
             sector     TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS cash_flows (
+            id          TEXT PRIMARY KEY,
+            captured_at TEXT NOT NULL,
+            date_time   TEXT NOT NULL,
+            type        TEXT NOT NULL,
+            amount      REAL NOT NULL,
+            currency    TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_cash_flows_date ON cash_flows (date_time);
     `);
     return _db;
 }
@@ -42,13 +54,22 @@ export function getDb(): Database.Database {
 export function savePortfolioHistory(
     totalPln: number,
     totalUsd: number | null,
-    exchangeRate: number | null
+    exchangeRate: number | null,
+    investedPln?: number,
+    pnlPln?: number
 ): void {
     getDb()
         .prepare(
-            'INSERT INTO portfolio_history (captured_at, total_pln, total_usd, exchange_rate) VALUES (?, ?, ?, ?)'
+            'INSERT INTO portfolio_history (captured_at, total_pln, total_usd, exchange_rate, invested_pln, pnl_pln) VALUES (?, ?, ?, ?, ?, ?)'
         )
-        .run(new Date().toISOString(), totalPln, totalUsd, exchangeRate);
+        .run(
+            new Date().toISOString(),
+            totalPln,
+            totalUsd,
+            exchangeRate,
+            investedPln ?? null,
+            pnlPln ?? null
+        );
 }
 
 export function loadPortfolioHistory(): {
@@ -105,6 +126,35 @@ export function loadSectors(tickers: string[]): Record<string, string> {
     return map;
 }
 
+export interface CashFlow {
+    id: string;
+    dateTime: string;
+    type: 'DEPOSIT' | 'WITHDRAWAL';
+    amount: number;
+    currency: string;
+}
+
+export function saveCashFlows(rows: CashFlow[]): void {
+    if (rows.length === 0) return;
+    const stmt = getDb().prepare(
+        'INSERT OR IGNORE INTO cash_flows (id, captured_at, date_time, type, amount, currency) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    const now = new Date().toISOString();
+    const insertMany = getDb().transaction((items: CashFlow[]) => {
+        for (const row of items) {
+            stmt.run(row.id, now, row.dateTime, row.type, row.amount, row.currency);
+        }
+    });
+    insertMany(rows);
+}
+
+export function getNetContributedCapital(): { amountPln: number } {
+    const rows = getDb()
+        .prepare('SELECT SUM(amount) as total FROM cash_flows WHERE currency = ?')
+        .get('PLN') as { total: number | null };
+    return { amountPln: rows.total ?? 0 };
+}
+
 export function missingSectorTickers(tickers: string[]): string[] {
     if (tickers.length === 0) return [];
     const existing = loadSectors(tickers);
@@ -118,6 +168,9 @@ export function loadLatestSnapshot(): {
     totalUsd: number | null;
     exchangeRate: number | null;
     capturedAt: string;
+    investedPln: number;
+    pnlPln: number;
+    pnlPct: number | null;
 } | null {
     const db = getDb();
     const stmt = db.prepare(
@@ -138,12 +191,19 @@ export function loadLatestSnapshot(): {
         )
         .get() as { total_usd: number | null; exchange_rate: number | null } | undefined;
 
+    const { amountPln: investedPln } = getNetContributedCapital();
+    const pnlPln = totalPln - investedPln;
+    const pnlPct = investedPln === 0 ? null : (pnlPln / investedPln) * 100;
+
     return {
         trading212: t212Data,
         binance: binanceData,
         totalPln,
         totalUsd: histRow?.total_usd ?? null,
         exchangeRate: histRow?.exchange_rate ?? null,
-        capturedAt: t212.captured_at
+        capturedAt: t212.captured_at,
+        investedPln,
+        pnlPln,
+        pnlPct
     };
 }

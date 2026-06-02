@@ -40,6 +40,9 @@ export interface PortfolioSnapshot {
     totalUsd: number | null;
     exchangeRate: number | null;
     capturedAt: string;
+    investedPln: number;
+    pnlPln: number;
+    pnlPct: number | null;
 }
 
 export interface SyncResult {
