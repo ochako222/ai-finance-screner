@@ -180,7 +180,7 @@ export function getNetContributedCapital(): { amountPln: number } {
 export function missingSectorTickers(tickers: string[]): string[] {
     if (tickers.length === 0) return [];
     const existing = loadInstrumentInfo(tickers);
-    return tickers.filter((t) => !(t in existing));
+    return tickers.filter((t) => !(t in existing) || existing[t].kind === null);
 }
 
 export function loadLatestSnapshot(): {

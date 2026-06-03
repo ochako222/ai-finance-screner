@@ -33,9 +33,26 @@ export async function fetchInstrumentInfo(
         const settled = await Promise.allSettled(
             batch.map(async (ticker) => {
                 const symbol = t212ToYahoo(ticker);
-                const summary = await yf.quoteSummary(symbol, {
-                    modules: ['assetProfile', 'quoteType']
-                });
+                let summary: Awaited<ReturnType<typeof yf.quoteSummary>>;
+                try {
+                    summary = await yf.quoteSummary(symbol, { modules: ['assetProfile', 'quoteType'] });
+                } catch {
+                    if (symbol.includes('.')) {
+                        throw new Error(`Yahoo lookup failed for ${symbol}`);
+                    }
+                    // Bare ticker: try common EU/UK exchange suffixes before giving up
+                    let resolved = false;
+                    for (const suffix of ['.L', '.DE', '.AS', '.PA']) {
+                        try {
+                            summary = await yf.quoteSummary(`${symbol}${suffix}`, { modules: ['assetProfile', 'quoteType'] });
+                            resolved = true;
+                            break;
+                        } catch {
+                            // try next suffix
+                        }
+                    }
+                    if (!resolved) throw new Error(`Yahoo lookup failed for ${symbol}`);
+                }
                 const sector = (summary.assetProfile as any)?.sector as string | undefined;
                 const quoteType = (summary.quoteType as any)?.quoteType as string | undefined;
                 const kind: 'Stock' | 'ETF' = quoteType === 'ETF' ? 'ETF' : 'Stock';
