@@ -17,24 +17,35 @@ function t212ToYahoo(ticker: string): string {
     return base;
 }
 
-export async function fetchSectors(tickers: string[]): Promise<Record<string, string>> {
+export interface InstrumentInfo {
+    sector: string | null;
+    kind: 'Stock' | 'ETF';
+}
+
+export async function fetchInstrumentInfo(
+    tickers: string[]
+): Promise<Record<string, InstrumentInfo>> {
     const CONCURRENCY = 5;
-    const result: Record<string, string> = {};
+    const result: Record<string, InstrumentInfo> = {};
 
     for (let i = 0; i < tickers.length; i += CONCURRENCY) {
         const batch = tickers.slice(i, i + CONCURRENCY);
         const settled = await Promise.allSettled(
             batch.map(async (ticker) => {
                 const symbol = t212ToYahoo(ticker);
-                const summary = await yf.quoteSummary(symbol, { modules: ['assetProfile'] });
+                const summary = await yf.quoteSummary(symbol, {
+                    modules: ['assetProfile', 'quoteType']
+                });
                 const sector = (summary.assetProfile as any)?.sector as string | undefined;
-                return { ticker, sector: sector ?? null };
+                const quoteType = (summary.quoteType as any)?.quoteType as string | undefined;
+                const kind: 'Stock' | 'ETF' = quoteType === 'ETF' ? 'ETF' : 'Stock';
+                return { ticker, sector: sector ?? null, kind };
             })
         );
 
         for (const res of settled) {
-            if (res.status === 'fulfilled' && res.value.sector) {
-                result[res.value.ticker] = res.value.sector;
+            if (res.status === 'fulfilled') {
+                result[res.value.ticker] = { sector: res.value.sector, kind: res.value.kind };
             }
         }
     }

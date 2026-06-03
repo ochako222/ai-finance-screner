@@ -3,8 +3,9 @@ import AllocationChart from '../components/AllocationChart';
 import CryptoTable from '../components/CryptoTable';
 import DynamicsChart from '../components/DynamicsChart';
 import Header from '../components/Header';
+import HeroOverview from '../components/HeroOverview';
+import PortfolioBalance from '../components/PortfolioBalance';
 import StocksTable from '../components/StocksTable';
-import SummaryCards from '../components/SummaryCards';
 import { usePortfolio, usePortfolioHistory, useSync } from '../hooks/usePortfolio';
 import { useAppStore } from '../store/appStore';
 
@@ -17,37 +18,36 @@ export default function DashboardPage() {
     if (isLoading) return <div className="loading">Loading portfolio…</div>;
 
     return (
-        <div className="dashboard">
+        <>
             <Header
-                lastSync={data?.capturedAt ?? null}
+                exchangeRate={data?.exchangeRate ?? null}
                 onSync={sync}
                 onAdvise={openPanel}
                 isSyncing={isSyncing}
             />
 
-            {!data && (
-                <div className="error-banner">
-                    {syncError ?? 'No portfolio data yet — click Synchronize to fetch.'}
-                </div>
-            )}
+            <main className="main">
+                <div className="grid">
+                    {!data && (
+                        <div className="error-banner span-3">
+                            {syncError ?? 'No portfolio data yet — click Synchronize to fetch.'}
+                        </div>
+                    )}
 
-            {data && (
-                <>
-                    <SummaryCards data={data} />
-                    <div className="dashboard__charts">
-                        <AllocationChart data={data} />
-                        <DynamicsChart history={history ?? []} />
-                    </div>
-                    <div className="dashboard__table">
-                        <StocksTable positions={data.trading212.positions} />
-                    </div>
-                    <div className="dashboard__table">
-                        <CryptoTable data={data.binance} />
-                    </div>
-                </>
-            )}
+                    {data && (
+                        <>
+                            <HeroOverview data={data} />
+                            <AllocationChart data={data} />
+                            <PortfolioBalance data={data} />
+                            <DynamicsChart history={history ?? []} />
+                            <StocksTable positions={data.trading212.positions} />
+                            <CryptoTable data={data.binance} />
+                        </>
+                    )}
+                </div>
+            </main>
 
             <AiPanel />
-        </div>
+        </>
     );
 }

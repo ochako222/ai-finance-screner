@@ -14,6 +14,7 @@ export interface T212Position {
     ppl: number;
     value: number;
     sector?: string | null;
+    kind?: 'Stock' | 'ETF';
 }
 
 export interface BinanceAsset {

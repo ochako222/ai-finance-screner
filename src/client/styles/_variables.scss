@@ -1,11 +1,68 @@
-$bg: #0d0f14;
-$surface: #161b22;
-$surface-2: #1c2128;
-$border: #30363d;
-$text: #e6edf3;
-$text-muted: #8b949e;
-$green: #48bb78;
-$red: #fc8181;
-$accent: #667eea;
-$yellow: #f6c90e;
-$radius: 8px;
+// Catppuccin Mocha
+$crust:    #11111b;
+$mantle:   #181825;
+$base:     #1e1e2e;
+$surface0: #313244;
+$surface1: #45475a;
+$surface2: #585b70;
+$overlay0: #6c7086;
+$overlay1: #7f849c;
+$overlay2: #9399b2;
+$subtext0: #a6adc8;
+$subtext1: #bac2de;
+$text:     #cdd6f4;
+$rosewater:#f5e0dc;
+$mauve:    #cba6f7;
+$lavender: #b4befe;
+$blue:     #89b4fa;
+$sapphire: #74c7ec;
+$sky:      #89dceb;
+$teal:     #94e2d5;
+$green:    #a6e3a1;
+$yellow:   #f9e2af;
+$peach:    #fab387;
+$maroon:   #eba0ac;
+$red:      #f38ba8;
+$pink:     #f5c2e7;
+
+$accent: $mauve;
+$pos:    $green;
+$neg:    $red;
+
+$gap:       12px;
+$radius:    12px;
+$radius-sm: 7px;
+$bar-h:     46px;
+$mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+// Export to CSS custom properties so TSX/SVG inline styles can reference them
+:root {
+  --crust:    #{$crust};
+  --mantle:   #{$mantle};
+  --base:     #{$base};
+  --surface0: #{$surface0};
+  --surface1: #{$surface1};
+  --surface2: #{$surface2};
+  --overlay0: #{$overlay0};
+  --overlay1: #{$overlay1};
+  --overlay2: #{$overlay2};
+  --subtext0: #{$subtext0};
+  --subtext1: #{$subtext1};
+  --text:     #{$text};
+  --rosewater:#{$rosewater};
+  --mauve:    #{$mauve};
+  --lavender: #{$lavender};
+  --blue:     #{$blue};
+  --sapphire: #{$sapphire};
+  --sky:      #{$sky};
+  --teal:     #{$teal};
+  --green:    #{$green};
+  --yellow:   #{$yellow};
+  --peach:    #{$peach};
+  --maroon:   #{$maroon};
+  --red:      #{$red};
+  --pink:     #{$pink};
+  --accent:   #{$mauve};
+  --pos:      #{$green};
+  --neg:      #{$red};
+}

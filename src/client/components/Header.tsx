@@ -1,33 +1,39 @@
 interface HeaderProps {
-    lastSync: string | null;
+    exchangeRate: number | null;
     onSync: () => void;
     onAdvise: () => void;
     isSyncing: boolean;
 }
 
-export default function Header({ lastSync, onSync, onAdvise, isSyncing }: HeaderProps) {
+export default function Header({ exchangeRate, onSync, onAdvise, isSyncing }: HeaderProps) {
     return (
-        <header className="header">
-            <div className="header__brand">
-                <span className="header__logo">✦</span>
-                <h1>Alex Financial Screener</h1>
+        <header className="bar">
+            <div className="bar__group">
+                <div className="brand">
+                    <span className="brand__star">✦</span>
+                    <span className="brand__user">alex@screener</span>
+                    <span className="brand__sep">:</span>
+                    <span className="brand__path">~/portfolio</span>
+                </div>
             </div>
-            <div className="header__actions">
-                {lastSync && (
-                    <span className="header__sync-time">
-                        Last sync: {new Date(lastSync).toLocaleString()}
+
+            <div className="bar__group">
+                {exchangeRate != null && (
+                    <span className="mod mod--rate">
+                        <span>$</span>
+                        {exchangeRate.toLocaleString('pl-PL', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        })}{' '}
+                        PLN
                     </span>
                 )}
-                <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={onSync}
-                    disabled={isSyncing}
-                >
+                <button type="button" className="btn" onClick={onSync} disabled={isSyncing}>
+                    <span>⟳</span>
                     {isSyncing ? 'Syncing…' : 'Synchronize'}
                 </button>
                 <button type="button" className="btn btn--primary" onClick={onAdvise}>
-                    Advise
+                    <span>✦</span>Advise
                 </button>
             </div>
         </header>

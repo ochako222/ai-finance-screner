@@ -1,90 +1,132 @@
-import { ArcElement, Chart as ChartJS, Legend, Tooltip } from 'chart.js';
-import { Doughnut } from 'react-chartjs-2';
 import type { PortfolioSnapshot } from '../support/types';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+// Donut geometry: r=70, circumference=2πr
+const R = 70;
+const CIRC = 2 * Math.PI * R; // ≈ 439.82
 
-const PALETTE = [
-    '#667eea',
-    '#48bb78',
-    '#f6c90e',
-    '#fc8181',
-    '#4fc3f7',
-    '#ce93d8',
-    '#ff8a65',
-    '#80cbc4',
-    '#a5d6a7',
-    '#90a4ae'
+const POSITION_COLORS = [
+    '#89b4fa', // blue
+    '#a6e3a1', // green
+    '#f9e2af', // yellow
+    '#eba0ac', // maroon
+    '#fab387', // peach
+    '#74c7ec', // sapphire
+    '#94e2d5', // teal
+    '#cba6f7' // mauve
 ];
+
+interface Segment {
+    dashLen: number;
+    startAngle: number;
+    color: string;
+}
+
+function buildSegments(values: number[], colors: string[]): Segment[] {
+    const total = values.reduce((s, v) => s + v, 0);
+    if (total === 0) return [];
+    let angle = 0;
+    return values.map((v, i) => {
+        const pct = v / total;
+        const seg: Segment = {
+            dashLen: pct * CIRC,
+            startAngle: angle,
+            color: colors[i % colors.length]
+        };
+        angle += pct * 360;
+        return seg;
+    });
+}
+
+interface DonutProps {
+    segments: Segment[];
+    centerLabel: string;
+    centerSub: string;
+    trackColor?: string;
+}
+
+function Donut({ segments, centerLabel, centerSub, trackColor = '#313244' }: DonutProps) {
+    return (
+        <div className="donut-wrap">
+            <svg viewBox="0 0 180 180" width="180" height="180" aria-hidden="true">
+                <g transform="rotate(-90 90 90)" fill="none" strokeWidth="26">
+                    <circle cx="90" cy="90" r={R} stroke={trackColor} />
+                    {segments.map((s) => (
+                        <circle
+                            key={s.color}
+                            cx="90"
+                            cy="90"
+                            r={R}
+                            stroke={s.color}
+                            strokeDasharray={`${s.dashLen} ${CIRC}`}
+                            transform={`rotate(${s.startAngle} 90 90)`}
+                        />
+                    ))}
+                </g>
+            </svg>
+            <div className="donut-center">
+                <b>{centerLabel}</b>
+                <span>{centerSub}</span>
+            </div>
+        </div>
+    );
+}
 
 interface Props {
     data: PortfolioSnapshot;
 }
 
 export default function AllocationChart({ data }: Props) {
-    const items = [
-        ...data.trading212.positions.map((p) => ({
-            label: p.ticker.split('_')[0],
-            value: p.value
-        })),
-        ...data.binance.assets.map((a) => ({
-            label: a.symbol,
-            value: a.valueUsd
-        }))
-    ]
-        .filter((i) => i.value > 0)
-        .sort((a, b) => b.value - a.value);
+    const positions = data.trading212.positions.filter((p) => p.value > 0);
 
-    if (items.length === 0) {
-        return (
-            <div className="allocation-chart">
-                <h3 className="section-title">Allocation</h3>
-                <p className="stub-notice">No positions to chart.</p>
-            </div>
-        );
-    }
+    // By position donut
+    const posSegs = buildSegments(
+        positions.map((p) => p.value),
+        POSITION_COLORS
+    );
 
-    const chartData = {
-        labels: items.map((i) => i.label),
-        datasets: [
-            {
-                data: items.map((i) => i.value),
-                backgroundColor: items.map((_, idx) => PALETTE[idx % PALETTE.length]),
-                borderColor: '#161b22',
-                borderWidth: 2
-            }
-        ]
-    };
-
-    const total = items.reduce((s, i) => s + i.value, 0);
+    // By instrument donut (Stock vs ETF)
+    const stockVal = positions
+        .filter((p) => !p.kind || p.kind === 'Stock')
+        .reduce((s, p) => s + p.value, 0);
+    const etfVal = positions.filter((p) => p.kind === 'ETF').reduce((s, p) => s + p.value, 0);
+    const total = stockVal + etfVal;
+    const stockPct = total > 0 ? Math.round((stockVal / total) * 100) : 100;
+    const instrSegs = buildSegments(
+        [stockVal, etfVal].filter((v) => v > 0),
+        ['#89b4fa', '#94e2d5'] // blue for stock, teal for ETF
+    );
 
     return (
-        <div className="allocation-chart">
-            <h3 className="section-title">Allocation</h3>
-            <Doughnut
-                data={chartData}
-                options={{
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { color: '#e6edf3', font: { size: 11 }, padding: 10 }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => {
-                                    const val = Number(ctx.raw).toLocaleString('pl-PL', {
-                                        style: 'currency',
-                                        currency: 'PLN',
-                                        maximumFractionDigits: 2
-                                    });
-                                    const pct = ((Number(ctx.raw) / total) * 100).toFixed(1);
-                                    return ` ${val} (${pct}%)`;
-                                }
-                            }
+        <section className="tile">
+            <div className="tile__head">
+                <div className="tile__title">
+                    <span className="glyph">▤</span> Trading 212 · Allocation
+                </div>
+                <span className="label">by market value</span>
+            </div>
+            <div className="alloc">
+                <div className="alloc__chart">
+                    <Donut
+                        segments={posSegs}
+                        centerLabel={String(positions.length)}
+                        centerSub="positions"
+                    />
+                    <div className="alloc__cap">by position</div>
+                </div>
+
+                <div className="alloc__chart alloc__chart--div">
+                    <Donut
+                        segments={
+                            instrSegs.length > 0
+                                ? instrSegs
+                                : [{ dashLen: CIRC, startAngle: 0, color: '#89b4fa' }]
                         }
-                    }
-                }}
-            />
-        </div>
+                        centerLabel={`${stockPct}%`}
+                        centerSub="stocks"
+                    />
+                    <div className="alloc__cap">by instrument</div>
+                </div>
+            </div>
+        </section>
     );
 }

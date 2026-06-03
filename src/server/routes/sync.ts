@@ -2,13 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { fetchBinance } from '../connectors/binance.js';
 import { fetchPlnUsdRate } from '../connectors/exchangeRate.js';
 import { fetchT212, fetchT212CashFlows } from '../connectors/trading212.js';
-import { fetchSectors } from '../connectors/yahoo.js';
+import { fetchInstrumentInfo } from '../connectors/yahoo.js';
 import {
     getNetContributedCapital,
     missingSectorTickers,
     saveCashFlows,
+    saveInstrumentInfo,
     savePortfolioHistory,
-    saveSector,
     saveSnapshot
 } from '../database.js';
 
@@ -40,12 +40,12 @@ export async function syncRoutes(fastify: FastifyInstance): Promise<void> {
             const missing = missingSectorTickers(t212Data.positions.map((p) => p.ticker));
             if (missing.length > 0) {
                 try {
-                    const sectors = await fetchSectors(missing);
-                    for (const [ticker, sector] of Object.entries(sectors)) {
-                        saveSector(ticker, sector);
+                    const info = await fetchInstrumentInfo(missing);
+                    for (const [ticker, { sector, kind }] of Object.entries(info)) {
+                        saveInstrumentInfo(ticker, sector, kind);
                     }
                 } catch (err) {
-                    fastify.log.warn(`Sector fetch failed: ${err}`);
+                    fastify.log.warn(`Instrument info fetch failed: ${err}`);
                 }
             }
 

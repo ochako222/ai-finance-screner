@@ -34,7 +34,7 @@ export function getDb(): Database.Database {
 
         CREATE TABLE IF NOT EXISTS instrument_sectors (
             ticker     TEXT PRIMARY KEY,
-            sector     TEXT NOT NULL,
+            sector     TEXT,
             updated_at TEXT NOT NULL
         );
 
@@ -48,6 +48,12 @@ export function getDb(): Database.Database {
         );
         CREATE INDEX IF NOT EXISTS idx_cash_flows_date ON cash_flows (date_time);
     `);
+    // Migration: add kind column to existing DBs (no-op if already present)
+    try {
+        _db.exec('ALTER TABLE instrument_sectors ADD COLUMN kind TEXT');
+    } catch {
+        // Column already exists — ignore
+    }
     return _db;
 }
 
@@ -107,22 +113,38 @@ export interface SnapshotRow {
     captured_at: string;
 }
 
-export function saveSector(ticker: string, sector: string): void {
-    getDb()
-        .prepare(
-            'INSERT INTO instrument_sectors (ticker, sector, updated_at) VALUES (?, ?, ?) ON CONFLICT(ticker) DO UPDATE SET sector = excluded.sector, updated_at = excluded.updated_at'
-        )
-        .run(ticker, sector, new Date().toISOString());
+export interface InstrumentRow {
+    sector: string | null;
+    kind: 'Stock' | 'ETF' | null;
 }
 
-export function loadSectors(tickers: string[]): Record<string, string> {
+export function saveInstrumentInfo(
+    ticker: string,
+    sector: string | null,
+    kind: 'Stock' | 'ETF'
+): void {
+    getDb()
+        .prepare(
+            'INSERT INTO instrument_sectors (ticker, sector, kind, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(ticker) DO UPDATE SET sector = excluded.sector, kind = excluded.kind, updated_at = excluded.updated_at'
+        )
+        .run(ticker, sector, kind, new Date().toISOString());
+}
+
+export function loadInstrumentInfo(tickers: string[]): Record<string, InstrumentRow> {
     if (tickers.length === 0) return {};
     const placeholders = tickers.map(() => '?').join(', ');
     const rows = getDb()
-        .prepare(`SELECT ticker, sector FROM instrument_sectors WHERE ticker IN (${placeholders})`)
-        .all(...tickers) as { ticker: string; sector: string }[];
-    const map: Record<string, string> = {};
-    for (const row of rows) map[row.ticker] = row.sector;
+        .prepare(
+            `SELECT ticker, sector, kind FROM instrument_sectors WHERE ticker IN (${placeholders})`
+        )
+        .all(...tickers) as { ticker: string; sector: string | null; kind: string | null }[];
+    const map: Record<string, InstrumentRow> = {};
+    for (const row of rows) {
+        map[row.ticker] = {
+            sector: row.sector,
+            kind: (row.kind as 'Stock' | 'ETF' | null) ?? null
+        };
+    }
     return map;
 }
 
@@ -157,7 +179,7 @@ export function getNetContributedCapital(): { amountPln: number } {
 
 export function missingSectorTickers(tickers: string[]): string[] {
     if (tickers.length === 0) return [];
-    const existing = loadSectors(tickers);
+    const existing = loadInstrumentInfo(tickers);
     return tickers.filter((t) => !(t in existing));
 }
 

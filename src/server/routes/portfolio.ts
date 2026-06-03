@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { loadLatestSnapshot, loadPortfolioHistory, loadSectors } from '../database.js';
+import { loadInstrumentInfo, loadLatestSnapshot, loadPortfolioHistory } from '../database.js';
 
 export async function portfolioRoutes(fastify: FastifyInstance): Promise<void> {
     fastify.get('/api/portfolio', async (_req, reply) => {
@@ -9,10 +9,11 @@ export async function portfolioRoutes(fastify: FastifyInstance): Promise<void> {
         }
 
         const tickers = snapshot.trading212.positions.map((p: any) => p.ticker);
-        const sectors = loadSectors(tickers);
+        const info = loadInstrumentInfo(tickers);
         snapshot.trading212.positions = snapshot.trading212.positions.map((p: any) => ({
             ...p,
-            sector: sectors[p.ticker] ?? null
+            sector: info[p.ticker]?.sector ?? null,
+            kind: info[p.ticker]?.kind ?? 'Stock'
         }));
 
         return snapshot;
