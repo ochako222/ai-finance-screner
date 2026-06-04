@@ -1,7 +1,7 @@
-# Specification Quality Checklist: Portfolio Totals Clarity
+# Specification Quality Checklist: Decoupled AI Portfolio Analysis with Enriched Sector Data
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-06-02
+**Created**: 2026-06-04
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,6 +31,7 @@
 
 ## Notes
 
-- "Invested" interpreted as net contributed capital (deposits − withdrawals); documented in Assumptions.
-- Primary currency assumed PLN, matching existing app convention.
-- Realized/unrealized split (US3) is P3 and gracefully deferrable if data unavailable.
+- The spec deliberately uses neutral phrasing ("brokerage", "reference-data source", "structured format") in functional requirements and success criteria, while naming the concrete providers (Trading 212, Yahoo Finance) only in the Input quote and Assumptions. This keeps requirements testable across provider changes while preserving the user's intent.
+- "Unknown" is treated as a first-class user-visible label, not a silent fallback. This is explicit in FR-013 and SC-007.
+- The /advise external-assistant flow is explicitly scoped as out-of-change in FR-015 to prevent accidental regression.
+- Items marked incomplete would require spec updates before `/speckit-clarify` or `/speckit-plan`. All items currently pass.

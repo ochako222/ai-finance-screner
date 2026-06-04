@@ -530,13 +530,13 @@ body {
         animation: pulse 1.5s ease-in-out infinite;
     }
 
-    &__text {
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-family: $mono;
-        font-size: 14px;
-        line-height: 1.7;
-        color: $text;
+    &__error {
+        padding: 12px 16px;
+        background: color-mix(in oklab, #{$red} 10%, transparent);
+        border: 1px solid color-mix(in oklab, #{$red} 30%, transparent);
+        border-radius: $radius-sm;
+        color: $red;
+        font-size: 13px;
     }
 
     &__footer {
@@ -545,6 +545,254 @@ body {
         font-size: 12px;
         color: $overlay1;
         flex-shrink: 0;
+    }
+}
+
+// ── AI Analysis structured view ───────────────────────────────────────────────
+.analysis {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+
+    &__section {}
+
+    &__heading {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: $overlay1;
+        margin-bottom: 12px;
+    }
+
+    &__overview-grid {
+        display: flex;
+        gap: 32px;
+        margin-bottom: 12px;
+    }
+
+    &__kv {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    &__kv-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: $overlay1;
+    }
+
+    &__kv-value {
+        font-size: 18px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: $text;
+    }
+
+    &__summary {
+        font-size: 13px;
+        line-height: 1.65;
+        color: $subtext1;
+        margin: 0;
+    }
+
+    &__perf-cols {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    &__perf-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: $overlay1;
+        margin-bottom: 8px;
+    }
+
+    &__perf-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        border-bottom: 1px solid color-mix(in oklab, #{$surface0} 55%, transparent);
+        font-size: 12.5px;
+        font-variant-numeric: tabular-nums;
+
+        &:last-child { border-bottom: none; }
+    }
+
+    &__perf-ticker {
+        font-weight: 700;
+        color: $text;
+        min-width: 80px;
+    }
+
+    &__perf-sector {
+        font-size: 11px;
+        color: $overlay1;
+        flex: 1;
+    }
+
+    &__perf-pnl {
+        font-weight: 700;
+        &.pos { color: $green; }
+        &.neg { color: $red; }
+    }
+
+    &__perf-val {
+        font-size: 11.5px;
+        &.pos { color: $green; }
+        &.neg { color: $red; }
+    }
+
+    &__risk-row {
+        margin-bottom: 12px;
+    }
+
+    &__sectors {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    &__sector-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+    }
+
+    &__sector-name {
+        width: 160px;
+        flex-shrink: 0;
+        color: $subtext1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &__sector-bar-wrap {
+        flex: 1;
+        height: 6px;
+        background: $surface0;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    &__sector-bar {
+        height: 100%;
+        background: linear-gradient(90deg, $mauve, $lavender);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+
+    &__sector-pct {
+        width: 42px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        color: $subtext1;
+        flex-shrink: 0;
+    }
+
+    &__recs {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    &__watchlist {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+.rec {
+    background: $base;
+    border: 1px solid $surface0;
+    border-radius: $radius-sm;
+    padding: 12px 14px;
+
+    &__top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    &__badge {
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        flex-shrink: 0;
+
+        &--buy      { color: $green;  background: color-mix(in oklab, #{$green}  14%, transparent); border-color: color-mix(in oklab, #{$green}  35%, transparent); }
+        &--sell     { color: $red;    background: color-mix(in oklab, #{$red}    14%, transparent); border-color: color-mix(in oklab, #{$red}    35%, transparent); }
+        &--hold     { color: $yellow; background: color-mix(in oklab, #{$yellow} 14%, transparent); border-color: color-mix(in oklab, #{$yellow} 35%, transparent); }
+        &--rebalance{ color: $mauve;  background: color-mix(in oklab, #{$mauve}  14%, transparent); border-color: color-mix(in oklab, #{$mauve}  35%, transparent); }
+        &--watch    { color: $peach;  background: color-mix(in oklab, #{$peach}  14%, transparent); border-color: color-mix(in oklab, #{$peach}  35%, transparent); }
+    }
+
+    &__ticker {
+        font-size: 11px;
+        font-weight: 700;
+        color: $blue;
+        letter-spacing: 0.05em;
+    }
+
+    &__title {
+        font-size: 13px;
+        font-weight: 600;
+        color: $text;
+    }
+
+    &__rationale {
+        font-size: 12.5px;
+        line-height: 1.6;
+        color: $subtext1;
+        margin: 0;
+    }
+}
+
+.watch-item {
+    padding: 10px 14px;
+    background: $base;
+    border: 1px solid $surface0;
+    border-radius: $radius-sm;
+
+    &__top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+
+    &__ticker {
+        font-weight: 700;
+        font-size: 13px;
+        color: $text;
+    }
+
+    &__sector {
+        font-size: 11px;
+        color: $overlay1;
+    }
+
+    &__reason {
+        font-size: 12.5px;
+        line-height: 1.6;
+        color: $subtext1;
+        margin: 0;
     }
 }
 
@@ -572,3 +820,60 @@ body {
     .alloc { gap: 28px; }
     .alloc__chart--div::before { left: -14px; }
 }
+
+// ── Positions table (inside AI panel) ────────────────────────────────────────
+.positions-table {
+    overflow-x: auto;
+    border: 1px solid $surface0;
+    border-radius: $radius-sm;
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+
+    th,
+    td {
+        padding: 8px 10px;
+        text-align: left;
+        border-bottom: 1px solid $surface0;
+        white-space: nowrap;
+    }
+
+    th {
+        background: $mantle;
+        color: $overlay2;
+        font-weight: 600;
+        font-size: 10.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    tbody tr:hover {
+        background: $surface0;
+    }
+
+    &__ticker {
+        font-family: $mono;
+        font-weight: 600;
+        color: $text;
+    }
+
+    &__num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    &__row--unknown {
+        color: $overlay1;
+    }
+
+    .pos { color: $pos; }
+    .neg { color: $neg; }
+}
+

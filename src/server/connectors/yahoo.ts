@@ -1,71 +1,97 @@
-import YahooFinance from 'yahoo-finance2';
+import yahooFinance from 'yahoo-finance2';
+import type { StockMetadata } from '../database.js';
 
-const yf = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
+const BATCH_SIZE = 5;
+const BATCH_DELAY_MS = 300;
 
-function t212ToYahoo(ticker: string): string {
-    const parts = ticker.split('_');
-    const base = parts[0].replace(/[a-z]+$/, '');
+const COUNTRY_TO_YAHOO: Record<string, string> = {
+    US: '',
+    DE: '.DE',
+    GY: '.DE',
+    GB: '.L',
+    UK: '.L',
+    LN: '.L',
+    FR: '.PA',
+    PA: '.PA',
+    NL: '.AS',
+    IT: '.MI',
+    ES: '.MC'
+};
 
-    const suffix = parts.slice(1).join('_');
-    if (suffix.startsWith('DE')) return `${base}.DE`;
-    if (suffix.startsWith('GB') || suffix.startsWith('UK')) return `${base}.L`;
-    if (suffix.startsWith('FR')) return `${base}.PA`;
-    if (suffix.startsWith('NL')) return `${base}.AS`;
-    if (suffix.startsWith('IT')) return `${base}.MI`;
-    if (suffix.startsWith('ES')) return `${base}.MC`;
-
-    return base;
+export function t212ToYahoo(t212Ticker: string): string {
+    const parts = t212Ticker.split('_');
+    const base = parts[0];
+    const country = parts[1];
+    const suffix = country !== undefined ? (COUNTRY_TO_YAHOO[country] ?? '') : '';
+    return base + suffix;
 }
 
-export interface InstrumentInfo {
-    sector: string | null;
-    kind: 'Stock' | 'ETF';
+export function quoteTypeToAssetType(qt: string | null | undefined): 'ETF' | 'Stock' | 'Unknown' {
+    if (qt === 'ETF') return 'ETF';
+    if (qt === 'EQUITY') return 'Stock';
+    return 'Unknown';
 }
 
-export async function fetchInstrumentInfo(
-    tickers: string[]
-): Promise<Record<string, InstrumentInfo>> {
-    const CONCURRENCY = 5;
-    const result: Record<string, InstrumentInfo> = {};
+function sleep(ms: number): Promise<void> {
+    return new Promise((r) => setTimeout(r, ms));
+}
 
-    for (let i = 0; i < tickers.length; i += CONCURRENCY) {
-        const batch = tickers.slice(i, i + CONCURRENCY);
-        const settled = await Promise.allSettled(
-            batch.map(async (ticker) => {
-                const symbol = t212ToYahoo(ticker);
-                let summary: Awaited<ReturnType<typeof yf.quoteSummary>>;
-                try {
-                    summary = await yf.quoteSummary(symbol, { modules: ['assetProfile', 'quoteType'] });
-                } catch {
-                    if (symbol.includes('.')) {
-                        throw new Error(`Yahoo lookup failed for ${symbol}`);
-                    }
-                    // Bare ticker: try common EU/UK exchange suffixes before giving up
-                    let resolved = false;
-                    for (const suffix of ['.L', '.DE', '.AS', '.PA']) {
-                        try {
-                            summary = await yf.quoteSummary(`${symbol}${suffix}`, { modules: ['assetProfile', 'quoteType'] });
-                            resolved = true;
-                            break;
-                        } catch {
-                            // try next suffix
-                        }
-                    }
-                    if (!resolved) throw new Error(`Yahoo lookup failed for ${symbol}`);
-                }
-                const sector = (summary.assetProfile as any)?.sector as string | undefined;
-                const quoteType = (summary.quoteType as any)?.quoteType as string | undefined;
-                const kind: 'Stock' | 'ETF' = quoteType === 'ETF' ? 'ETF' : 'Stock';
-                return { ticker, sector: sector ?? null, kind };
-            })
-        );
+interface YahooClient {
+    quoteSummary(
+        symbol: string,
+        opts: { modules: ('assetProfile' | 'price')[] }
+    ): Promise<{
+        assetProfile?: { sector?: string | null; industry?: string | null } | null;
+        price?: {
+            quoteType?: string | null;
+            longName?: string | null;
+            shortName?: string | null;
+        } | null;
+    }>;
+}
 
-        for (const res of settled) {
-            if (res.status === 'fulfilled') {
-                result[res.value.ticker] = { sector: res.value.sector, kind: res.value.kind };
-            }
-        }
+async function fetchOne(
+    yf: YahooClient,
+    t212Ticker: string,
+    now: string
+): Promise<StockMetadata | null> {
+    const yahooSymbol = t212ToYahoo(t212Ticker);
+    try {
+        const res = await yf.quoteSummary(yahooSymbol, {
+            modules: ['assetProfile', 'price']
+        });
+        const sector = res.assetProfile?.sector ?? null;
+        const industry = res.assetProfile?.industry ?? null;
+        const assetType = quoteTypeToAssetType(res.price?.quoteType);
+        const longName = res.price?.longName ?? res.price?.shortName ?? null;
+        return {
+            ticker: t212Ticker,
+            sector,
+            industry,
+            assetType,
+            longName,
+            fetchedAt: now
+        };
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[yahoo] ${t212Ticker} (${yahooSymbol}): ${msg}`);
+        return null;
     }
+}
 
-    return result;
+export async function fetchStockMetadata(tickers: string[]): Promise<StockMetadata[]> {
+    if (tickers.length === 0) return [];
+    const yf = yahooFinance as unknown as YahooClient;
+    const now = new Date().toISOString();
+    const out: StockMetadata[] = [];
+
+    for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
+        const batch = tickers.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(batch.map((t) => fetchOne(yf, t, now)));
+        for (const r of results) {
+            if (r.status === 'fulfilled' && r.value !== null) out.push(r.value);
+        }
+        if (i + BATCH_SIZE < tickers.length) await sleep(BATCH_DELAY_MS);
+    }
+    return out;
 }

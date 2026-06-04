@@ -13,7 +13,7 @@ export default function DashboardPage() {
     const { data, isLoading } = usePortfolio();
     const { data: history } = usePortfolioHistory();
     const { sync } = useSync();
-    const { isSyncing, openPanel, syncError } = useAppStore();
+    const { isSyncing, openPanel, syncError, analysisResult } = useAppStore();
 
     if (isLoading) return <div className="loading">Loading portfolio…</div>;
 
@@ -37,7 +37,7 @@ export default function DashboardPage() {
                     {data && (
                         <>
                             <HeroOverview data={data} />
-                            <AllocationChart data={data} />
+                            <AllocationChart data={data} analysis={analysisResult} />
                             <PortfolioBalance data={data} />
                             <DynamicsChart history={history ?? []} />
                             <StocksTable positions={data.trading212.positions} />

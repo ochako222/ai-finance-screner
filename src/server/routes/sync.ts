@@ -2,14 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { fetchBinance } from '../connectors/binance.js';
 import { fetchPlnUsdRate } from '../connectors/exchangeRate.js';
 import { fetchT212, fetchT212CashFlows } from '../connectors/trading212.js';
-import { fetchInstrumentInfo } from '../connectors/yahoo.js';
+import { fetchStockMetadata } from '../connectors/yahoo.js';
 import {
     getNetContributedCapital,
-    missingSectorTickers,
     saveCashFlows,
-    saveInstrumentInfo,
     savePortfolioHistory,
-    saveSnapshot
+    saveSnapshot,
+    upsertStockMetadata
 } from '../database.js';
 
 export async function syncRoutes(fastify: FastifyInstance): Promise<void> {
@@ -37,18 +36,6 @@ export async function syncRoutes(fastify: FastifyInstance): Promise<void> {
         if (t212Data) {
             saveSnapshot('trading212', t212Data);
 
-            const missing = missingSectorTickers(t212Data.positions.map((p) => p.ticker));
-            if (missing.length > 0) {
-                try {
-                    const info = await fetchInstrumentInfo(missing);
-                    for (const [ticker, { sector, kind }] of Object.entries(info)) {
-                        saveInstrumentInfo(ticker, sector, kind);
-                    }
-                } catch (err) {
-                    fastify.log.warn(`Instrument info fetch failed: ${err}`);
-                }
-            }
-
             try {
                 await new Promise((r) => setTimeout(r, 1100));
                 const cashFlows = await fetchT212CashFlows();
@@ -64,6 +51,19 @@ export async function syncRoutes(fastify: FastifyInstance): Promise<void> {
                 fastify.log.info(`Cash flows synced: ${cashFlows.length} rows`);
             } catch (err) {
                 fastify.log.error(`Cash flow sync failed: ${err}`);
+            }
+
+            if (t212Data.positions.length > 0) {
+                try {
+                    const tickers = t212Data.positions.map((p) => p.ticker);
+                    const metadata = await fetchStockMetadata(tickers);
+                    upsertStockMetadata(metadata);
+                    fastify.log.info(
+                        `Yahoo enrichment: refreshed ${metadata.length}/${tickers.length} tickers`
+                    );
+                } catch (err) {
+                    fastify.log.warn(`Yahoo enrichment skipped: ${err}`);
+                }
             }
         }
         saveSnapshot('binance', binanceData);

@@ -32,12 +32,6 @@ export function getDb(): Database.Database {
         );
         CREATE INDEX IF NOT EXISTS idx_history_time ON portfolio_history (captured_at DESC);
 
-        CREATE TABLE IF NOT EXISTS instrument_sectors (
-            ticker     TEXT PRIMARY KEY,
-            sector     TEXT,
-            updated_at TEXT NOT NULL
-        );
-
         CREATE TABLE IF NOT EXISTS cash_flows (
             id          TEXT PRIMARY KEY,
             captured_at TEXT NOT NULL,
@@ -47,13 +41,16 @@ export function getDb(): Database.Database {
             currency    TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_cash_flows_date ON cash_flows (date_time);
+
+        CREATE TABLE IF NOT EXISTS stock_metadata (
+            ticker      TEXT PRIMARY KEY,
+            sector      TEXT,
+            industry    TEXT,
+            asset_type  TEXT NOT NULL DEFAULT 'Unknown',
+            long_name   TEXT,
+            fetched_at  TEXT NOT NULL
+        );
     `);
-    // Migration: add kind column to existing DBs (no-op if already present)
-    try {
-        _db.exec('ALTER TABLE instrument_sectors ADD COLUMN kind TEXT');
-    } catch {
-        // Column already exists — ignore
-    }
     return _db;
 }
 
@@ -113,41 +110,6 @@ export interface SnapshotRow {
     captured_at: string;
 }
 
-export interface InstrumentRow {
-    sector: string | null;
-    kind: 'Stock' | 'ETF' | null;
-}
-
-export function saveInstrumentInfo(
-    ticker: string,
-    sector: string | null,
-    kind: 'Stock' | 'ETF'
-): void {
-    getDb()
-        .prepare(
-            'INSERT INTO instrument_sectors (ticker, sector, kind, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(ticker) DO UPDATE SET sector = excluded.sector, kind = excluded.kind, updated_at = excluded.updated_at'
-        )
-        .run(ticker, sector, kind, new Date().toISOString());
-}
-
-export function loadInstrumentInfo(tickers: string[]): Record<string, InstrumentRow> {
-    if (tickers.length === 0) return {};
-    const placeholders = tickers.map(() => '?').join(', ');
-    const rows = getDb()
-        .prepare(
-            `SELECT ticker, sector, kind FROM instrument_sectors WHERE ticker IN (${placeholders})`
-        )
-        .all(...tickers) as { ticker: string; sector: string | null; kind: string | null }[];
-    const map: Record<string, InstrumentRow> = {};
-    for (const row of rows) {
-        map[row.ticker] = {
-            sector: row.sector,
-            kind: (row.kind as 'Stock' | 'ETF' | null) ?? null
-        };
-    }
-    return map;
-}
-
 export interface CashFlow {
     id: string;
     dateTime: string;
@@ -170,17 +132,63 @@ export function saveCashFlows(rows: CashFlow[]): void {
     insertMany(rows);
 }
 
+export interface StockMetadata {
+    ticker: string;
+    sector: string | null;
+    industry: string | null;
+    assetType: 'ETF' | 'Stock' | 'Unknown';
+    longName: string | null;
+    fetchedAt: string;
+}
+
+export interface StockMetadataRow {
+    ticker: string;
+    sector: string | null;
+    industry: string | null;
+    asset_type: 'ETF' | 'Stock' | 'Unknown';
+    long_name: string | null;
+    fetched_at: string;
+}
+
+export function upsertStockMetadata(rows: StockMetadata[]): void {
+    if (rows.length === 0) return;
+    const stmt = getDb().prepare(
+        `INSERT INTO stock_metadata (ticker, sector, industry, asset_type, long_name, fetched_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(ticker) DO UPDATE SET
+             sector     = excluded.sector,
+             industry   = excluded.industry,
+             asset_type = excluded.asset_type,
+             long_name  = excluded.long_name,
+             fetched_at = excluded.fetched_at`
+    );
+    const txn = getDb().transaction((items: StockMetadata[]) => {
+        for (const r of items) {
+            stmt.run(r.ticker, r.sector, r.industry, r.assetType, r.longName, r.fetchedAt);
+        }
+    });
+    txn(rows);
+}
+
+export function loadStockMetadata(tickers: string[]): Map<string, StockMetadataRow> {
+    const out = new Map<string, StockMetadataRow>();
+    if (tickers.length === 0) return out;
+    const placeholders = tickers.map(() => '?').join(',');
+    const rows = getDb()
+        .prepare(
+            `SELECT ticker, sector, industry, asset_type, long_name, fetched_at
+             FROM stock_metadata WHERE ticker IN (${placeholders})`
+        )
+        .all(...tickers) as StockMetadataRow[];
+    for (const r of rows) out.set(r.ticker, r);
+    return out;
+}
+
 export function getNetContributedCapital(): { amountPln: number } {
     const rows = getDb()
         .prepare('SELECT SUM(amount) as total FROM cash_flows WHERE currency = ?')
         .get('PLN') as { total: number | null };
     return { amountPln: rows.total ?? 0 };
-}
-
-export function missingSectorTickers(tickers: string[]): string[] {
-    if (tickers.length === 0) return [];
-    const existing = loadInstrumentInfo(tickers);
-    return tickers.filter((t) => !(t in existing) || existing[t].kind === null);
 }
 
 export function loadLatestSnapshot(): {
