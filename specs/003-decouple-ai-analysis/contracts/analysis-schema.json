@@ -1,0 +1,150 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ANALYSIS_SCHEMA (003-decouple-ai-analysis)",
+    "type": "object",
+    "required": [
+        "overview",
+        "performance",
+        "risk",
+        "recommendations",
+        "watchlist",
+        "positions_summary",
+        "allocation"
+    ],
+    "properties": {
+        "overview": {
+            "type": "object",
+            "required": ["total_value", "stocks_value", "crypto_value", "currency", "summary"],
+            "properties": {
+                "total_value": { "type": "number" },
+                "stocks_value": { "type": "number" },
+                "crypto_value": { "type": "number" },
+                "currency": { "type": "string" },
+                "summary": { "type": "string" }
+            }
+        },
+        "performance": {
+            "type": "object",
+            "required": ["top", "losers"],
+            "properties": {
+                "top": { "type": "array", "items": { "$ref": "#/$defs/PositionPerf" } },
+                "losers": { "type": "array", "items": { "$ref": "#/$defs/PositionPerf" } }
+            }
+        },
+        "risk": {
+            "type": "object",
+            "required": ["concentration_pct", "top_sectors", "notes"],
+            "properties": {
+                "concentration_pct": { "type": "number" },
+                "top_sectors": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["sector", "weight_pct"],
+                        "properties": {
+                            "sector": { "type": "string" },
+                            "weight_pct": { "type": "number" }
+                        }
+                    }
+                },
+                "notes": { "type": "string" }
+            }
+        },
+        "recommendations": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+                "type": "object",
+                "required": ["title", "rationale", "action"],
+                "properties": {
+                    "title": { "type": "string" },
+                    "rationale": { "type": "string" },
+                    "action": {
+                        "type": "string",
+                        "enum": ["buy", "sell", "hold", "rebalance", "watch"]
+                    },
+                    "ticker": { "type": "string" }
+                }
+            }
+        },
+        "watchlist": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["ticker", "reason"],
+                "properties": {
+                    "ticker": { "type": "string" },
+                    "sector": { "type": "string" },
+                    "reason": { "type": "string" }
+                }
+            }
+        },
+        "positions_summary": {
+            "type": "array",
+            "description": "Every held position, regardless of size. Used by the dashboard positions table.",
+            "items": {
+                "type": "object",
+                "required": ["ticker", "asset_type", "weight_pct", "pnl_pct"],
+                "properties": {
+                    "ticker": { "type": "string" },
+                    "long_name": { "type": ["string", "null"] },
+                    "asset_type": {
+                        "type": "string",
+                        "enum": ["ETF", "Stock", "Unknown"]
+                    },
+                    "sector": { "type": ["string", "null"] },
+                    "industry": { "type": ["string", "null"] },
+                    "weight_pct": { "type": "number" },
+                    "pnl_pct": { "type": "number" }
+                }
+            }
+        },
+        "allocation": {
+            "type": "object",
+            "required": ["by_asset_type", "by_sector", "by_industry"],
+            "properties": {
+                "by_asset_type": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/AllocationBucket" }
+                },
+                "by_sector": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/AllocationBucket" }
+                },
+                "by_industry": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/AllocationBucket" }
+                }
+            }
+        }
+    },
+    "$defs": {
+        "PositionPerf": {
+            "type": "object",
+            "required": ["ticker", "pnl_pct", "asset_type"],
+            "properties": {
+                "ticker": { "type": "string" },
+                "sector": { "type": ["string", "null"] },
+                "industry": { "type": ["string", "null"] },
+                "asset_type": {
+                    "type": "string",
+                    "enum": ["ETF", "Stock", "Unknown"]
+                },
+                "pnl_pct": { "type": "number" },
+                "pnl_value": { "type": "number" }
+            }
+        },
+        "AllocationBucket": {
+            "type": "object",
+            "required": ["label", "weight_pct"],
+            "properties": {
+                "label": {
+                    "type": "string",
+                    "description": "Sector name, industry name, or AssetType. For by_asset_type the label is one of 'ETF' | 'Stock' | 'Unknown'."
+                },
+                "weight_pct": { "type": "number" }
+            }
+        }
+    }
+}

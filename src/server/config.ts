@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'smol-toml';
 
 interface AppConfig {
-    trading212: { api_key: string; api_secret?: string };
+    trading212: { api_key: string; api_secret?: string; mcp_path?: string };
     binance: { api_key: string; api_secret: string };
     app: { port: number };
     ai: { model: string; effort: string };

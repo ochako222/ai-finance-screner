@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import type { AnalysisMeta } from '../support/types';
+import type { AnalysisMeta, AnalysisResult } from '../support/types';
 
 interface AppStore {
     isPanelOpen: boolean;
     isSyncing: boolean;
     isAnalyzing: boolean;
-    analysisText: string;
+    analysisResult: AnalysisResult | null;
+    analysisError: string | null;
     analysisMeta: AnalysisMeta | null;
     syncError: string | null;
 
@@ -14,7 +15,8 @@ interface AppStore {
     setSyncing: (v: boolean) => void;
     setSyncError: (err: string | null) => void;
     setAnalyzing: (v: boolean) => void;
-    setAnalysisText: (text: string) => void;
+    setAnalysisResult: (result: AnalysisResult) => void;
+    setAnalysisError: (message: string | undefined) => void;
     setAnalysisMeta: (meta: AnalysisMeta) => void;
 }
 
@@ -22,16 +24,25 @@ export const useAppStore = create<AppStore>()((set) => ({
     isPanelOpen: false,
     isSyncing: false,
     isAnalyzing: false,
-    analysisText: '',
+    analysisResult: null,
+    analysisError: null,
     analysisMeta: null,
     syncError: null,
 
     openPanel: () =>
-        set({ isPanelOpen: true, analysisText: '', analysisMeta: null, isAnalyzing: false }),
+        set({
+            isPanelOpen: true,
+            analysisResult: null,
+            analysisError: null,
+            analysisMeta: null,
+            isAnalyzing: false
+        }),
     closePanel: () => set({ isPanelOpen: false }),
     setSyncing: (v) => set({ isSyncing: v }),
     setSyncError: (err) => set({ syncError: err }),
     setAnalyzing: (v) => set({ isAnalyzing: v }),
-    setAnalysisText: (text) => set({ analysisText: text }),
+    setAnalysisResult: (result) => set({ analysisResult: result }),
+    setAnalysisError: (message) =>
+        set({ analysisError: message ?? 'Analysis failed', isAnalyzing: false }),
     setAnalysisMeta: (meta) => set({ analysisMeta: meta, isAnalyzing: false })
 }));

@@ -16,7 +16,67 @@ function setupSchema(d: Database.Database) {
             amount      REAL NOT NULL,
             currency    TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS stock_metadata (
+            ticker      TEXT PRIMARY KEY,
+            sector      TEXT,
+            industry    TEXT,
+            asset_type  TEXT NOT NULL DEFAULT 'Unknown',
+            long_name   TEXT,
+            fetched_at  TEXT NOT NULL
+        );
     `);
+}
+
+interface StockMetadataInput {
+    ticker: string;
+    sector: string | null;
+    industry: string | null;
+    assetType: 'ETF' | 'Stock' | 'Unknown';
+    longName: string | null;
+    fetchedAt: string;
+}
+
+interface StockMetadataDbRow {
+    ticker: string;
+    sector: string | null;
+    industry: string | null;
+    asset_type: 'ETF' | 'Stock' | 'Unknown';
+    long_name: string | null;
+    fetched_at: string;
+}
+
+function upsertMetadata(d: Database.Database, rows: StockMetadataInput[]) {
+    const stmt = d.prepare(
+        `INSERT INTO stock_metadata (ticker, sector, industry, asset_type, long_name, fetched_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(ticker) DO UPDATE SET
+             sector     = excluded.sector,
+             industry   = excluded.industry,
+             asset_type = excluded.asset_type,
+             long_name  = excluded.long_name,
+             fetched_at = excluded.fetched_at`
+    );
+    const txn = d.transaction((items: StockMetadataInput[]) => {
+        for (const r of items) {
+            stmt.run(r.ticker, r.sector, r.industry, r.assetType, r.longName, r.fetchedAt);
+        }
+    });
+    txn(rows);
+}
+
+function loadMetadata(d: Database.Database, tickers: string[]): Map<string, StockMetadataDbRow> {
+    const out = new Map<string, StockMetadataDbRow>();
+    if (tickers.length === 0) return out;
+    const placeholders = tickers.map(() => '?').join(',');
+    const rows = d
+        .prepare(
+            `SELECT ticker, sector, industry, asset_type, long_name, fetched_at
+             FROM stock_metadata WHERE ticker IN (${placeholders})`
+        )
+        .all(...tickers) as StockMetadataDbRow[];
+    for (const r of rows) out.set(r.ticker, r);
+    return out;
 }
 
 function insertFlow(
@@ -80,5 +140,76 @@ describe('net contributed capital aggregation', () => {
         insertFlow(db, 'd1', 'DEPOSIT', 1000);
         insertFlow(db, 'd1', 'DEPOSIT', 1000); // duplicate — should be ignored
         expect(netPln(db)).toBe(1000);
+    });
+});
+
+describe('stock_metadata upsert/load', () => {
+    it('inserts and reads back multiple rows', () => {
+        upsertMetadata(db, [
+            {
+                ticker: 'AAPL_US_EQ',
+                sector: 'Technology',
+                industry: 'Consumer Electronics',
+                assetType: 'Stock',
+                longName: 'Apple Inc.',
+                fetchedAt: '2026-06-04T08:00:00.000Z'
+            },
+            {
+                ticker: 'VWCE_GY_ETF',
+                sector: null,
+                industry: null,
+                assetType: 'ETF',
+                longName: 'Vanguard FTSE All-World UCITS Acc',
+                fetchedAt: '2026-06-04T08:00:00.000Z'
+            }
+        ]);
+        const out = loadMetadata(db, ['AAPL_US_EQ', 'VWCE_GY_ETF']);
+        expect(out.size).toBe(2);
+        expect(out.get('AAPL_US_EQ')?.sector).toBe('Technology');
+        expect(out.get('VWCE_GY_ETF')?.asset_type).toBe('ETF');
+        expect(out.get('VWCE_GY_ETF')?.sector).toBeNull();
+    });
+
+    it('preserves rows for tickers not in the upsert payload (FR-004)', () => {
+        upsertMetadata(db, [
+            {
+                ticker: 'AAPL_US_EQ',
+                sector: 'Technology',
+                industry: 'Consumer Electronics',
+                assetType: 'Stock',
+                longName: 'Apple Inc.',
+                fetchedAt: '2026-06-04T08:00:00.000Z'
+            },
+            {
+                ticker: 'MSFT_US_EQ',
+                sector: 'Technology',
+                industry: 'Software—Infrastructure',
+                assetType: 'Stock',
+                longName: 'Microsoft Corp',
+                fetchedAt: '2026-06-04T08:00:00.000Z'
+            }
+        ]);
+        // Simulate a later sync where only AAPL gets refreshed (e.g. MSFT failed at Yahoo).
+        upsertMetadata(db, [
+            {
+                ticker: 'AAPL_US_EQ',
+                sector: 'Technology',
+                industry: 'Consumer Electronics',
+                assetType: 'Stock',
+                longName: 'Apple Inc.',
+                fetchedAt: '2026-06-04T09:00:00.000Z'
+            }
+        ]);
+        const out = loadMetadata(db, ['AAPL_US_EQ', 'MSFT_US_EQ']);
+        expect(out.get('AAPL_US_EQ')?.fetched_at).toBe('2026-06-04T09:00:00.000Z');
+        // MSFT row MUST remain at its original fetched_at — failure did not erase it.
+        expect(out.get('MSFT_US_EQ')?.fetched_at).toBe('2026-06-04T08:00:00.000Z');
+        expect(out.get('MSFT_US_EQ')?.sector).toBe('Technology');
+    });
+
+    it('returns empty map for never-inserted tickers (caller defaults to Unknown)', () => {
+        const out = loadMetadata(db, ['GHOST_US_EQ']);
+        expect(out.size).toBe(0);
+        expect(out.get('GHOST_US_EQ')).toBeUndefined();
     });
 });

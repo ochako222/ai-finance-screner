@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
 import type { FastifyInstance } from 'fastify';
 import { loadConfig } from '../config.js';
-import { loadLatestSnapshot } from '../database.js';
-import { type PortfolioContext, PROMPTS } from '../prompts/index.js';
+import { loadLatestSnapshot, loadStockMetadata } from '../database.js';
+import { mergePositionsWithMetadata } from '../lib/mergePositions.js';
+import { ANALYSIS_SCHEMA, type AnalyzePayload, PROMPTS } from '../prompts/index.js';
 
 export async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
     fastify.get('/api/analyze/stream', async (request, reply) => {
@@ -11,9 +12,8 @@ export async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
             return reply.status(400).send({ error: 'No portfolio data. Synchronize first.' });
         }
 
-        const { model, effort } = loadConfig().ai;
-        const ctx: PortfolioContext = { ...snapshot };
-        const prompt = PROMPTS.advise(ctx);
+        const cfg = loadConfig();
+        const { model, effort } = cfg.ai;
 
         reply.raw.writeHead(200, {
             'Content-Type': 'text/event-stream',
@@ -26,16 +26,32 @@ export async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
             reply.raw.write(`event: ${event}\ndata: ${data}\n\n`);
         };
 
+        const positions = snapshot.trading212.positions;
+        const byTicker = loadStockMetadata(positions.map((p) => p.ticker));
+        const enriched = mergePositionsWithMetadata(positions, byTicker);
+
+        const payload: AnalyzePayload = {
+            captured_at: snapshot.capturedAt,
+            currency: 'PLN',
+            account_summary: snapshot.trading212.summary,
+            invested_pln: snapshot.investedPln,
+            pnl_pln: snapshot.pnlPln,
+            pnl_pct: snapshot.pnlPct,
+            positions: enriched
+        };
+
         const proc = spawn('claude', [
             '-p',
-            prompt,
+            PROMPTS.analyzeWithData(payload),
             '--model',
             model,
             '--effort',
             effort,
             '--output-format',
             'stream-json',
-            '--verbose'
+            '--verbose',
+            '--json-schema',
+            JSON.stringify(ANALYSIS_SCHEMA)
         ]);
 
         let buf = '';
@@ -48,13 +64,15 @@ export async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
             for (const line of lines.filter(Boolean)) {
                 try {
                     const ev = JSON.parse(line);
-                    if (ev.type === 'assistant') {
-                        const text = (ev.message?.content ?? [])
-                            .filter((b: any) => b.type === 'text')
-                            .map((b: any) => b.text)
-                            .join('');
-                        if (text) send('text', text);
-                    } else if (ev.type === 'result') {
+                    if (ev.type === 'result') {
+                        if (ev.subtype === 'success' && ev.structured_output) {
+                            send('analysis', JSON.stringify(ev.structured_output));
+                        } else {
+                            send(
+                                'error',
+                                JSON.stringify({ message: ev.subtype ?? 'unknown_error' })
+                            );
+                        }
                         send(
                             'done',
                             JSON.stringify({
@@ -74,7 +92,7 @@ export async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
         });
 
         proc.on('error', (err) => {
-            send('error', err.message);
+            send('error', JSON.stringify({ message: err.message }));
             reply.raw.end();
         });
 
