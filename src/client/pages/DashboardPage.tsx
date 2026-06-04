@@ -1,4 +1,3 @@
-import AiPanel from '../components/AiPanel';
 import AllocationChart from '../components/AllocationChart';
 import CryptoTable from '../components/CryptoTable';
 import DynamicsChart from '../components/DynamicsChart';
@@ -13,18 +12,13 @@ export default function DashboardPage() {
     const { data, isLoading } = usePortfolio();
     const { data: history } = usePortfolioHistory();
     const { sync } = useSync();
-    const { isSyncing, openPanel, syncError, analysisResult } = useAppStore();
+    const { isSyncing, syncError } = useAppStore();
 
     if (isLoading) return <div className="loading">Loading portfolio…</div>;
 
     return (
         <>
-            <Header
-                exchangeRate={data?.exchangeRate ?? null}
-                onSync={sync}
-                onAdvise={openPanel}
-                isSyncing={isSyncing}
-            />
+            <Header exchangeRate={data?.exchangeRate ?? null} onSync={sync} isSyncing={isSyncing} />
 
             <main className="main">
                 <div className="grid">
@@ -37,7 +31,7 @@ export default function DashboardPage() {
                     {data && (
                         <>
                             <HeroOverview data={data} />
-                            <AllocationChart data={data} analysis={analysisResult} />
+                            <AllocationChart data={data} />
                             <PortfolioBalance data={data} />
                             <DynamicsChart history={history ?? []} />
                             <StocksTable positions={data.trading212.positions} />
@@ -46,8 +40,6 @@ export default function DashboardPage() {
                     )}
                 </div>
             </main>
-
-            <AiPanel />
         </>
     );
 }

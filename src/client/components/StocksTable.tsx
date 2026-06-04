@@ -34,8 +34,11 @@ export default function StocksTable({ positions }: Props) {
                     <thead>
                         <tr>
                             <th className="th-left">Ticker</th>
+                            <th className="th-left">Name</th>
                             <th className="th-left">Type</th>
-                            <th className="th-left">Sector</th>
+                            <th className="th-left">Market</th>
+                            <th className="th-left">Industry</th>
+                            <th className="th-left">Index</th>
                             <th>Qty</th>
                             <th>Avg Price</th>
                             <th>Current</th>
@@ -45,9 +48,8 @@ export default function StocksTable({ positions }: Props) {
                     </thead>
                     <tbody>
                         {positions.map((pos, idx) => {
-                            const ticker = pos.ticker.split('_')[0];
-                            const sector = pos.sector && pos.sector !== '—' ? pos.sector : null;
-                            const kind = pos.kind ?? 'Stock';
+                            const ticker = pos.ticker.split('_')[0].replace(/[a-z]+$/, '');
+                            const type = pos.type ?? 'Unknown';
 
                             return (
                                 <tr key={pos.ticker}>
@@ -60,14 +62,31 @@ export default function StocksTable({ positions }: Props) {
                                         </span>
                                     </td>
                                     <td style={{ textAlign: 'left' }}>
-                                        <span className={`kindtag kindtag--${kind.toLowerCase()}`}>
-                                            {kind.toUpperCase()}
+                                        {pos.name ? (
+                                            <span className="pos-name">{pos.name}</span>
+                                        ) : (
+                                            <span style={{ color: 'var(--overlay0)' }}>—</span>
+                                        )}
+                                    </td>
+                                    <td style={{ textAlign: 'left' }}>
+                                        <span className={`kindtag kindtag--${type.toLowerCase()}`}>
+                                            {type.toUpperCase()}
                                         </span>
                                     </td>
                                     <td style={{ textAlign: 'left' }}>
-                                        {sector ? (
-                                            <span className="sectag" data-sector={sector}>
-                                                {sector}
+                                        {pos.market ?? (
+                                            <span style={{ color: 'var(--overlay0)' }}>—</span>
+                                        )}
+                                    </td>
+                                    <td style={{ textAlign: 'left' }}>
+                                        {pos.industry ?? (
+                                            <span style={{ color: 'var(--overlay0)' }}>—</span>
+                                        )}
+                                    </td>
+                                    <td style={{ textAlign: 'left' }}>
+                                        {pos.indexTracked ? (
+                                            <span title={pos.indexTracked} className="index-cell">
+                                                {pos.indexTracked}
                                             </span>
                                         ) : (
                                             <span style={{ color: 'var(--overlay0)' }}>—</span>

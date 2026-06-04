@@ -42,13 +42,15 @@ export function getDb(): Database.Database {
         );
         CREATE INDEX IF NOT EXISTS idx_cash_flows_date ON cash_flows (date_time);
 
-        CREATE TABLE IF NOT EXISTS stock_metadata (
-            ticker      TEXT PRIMARY KEY,
-            sector      TEXT,
-            industry    TEXT,
-            asset_type  TEXT NOT NULL DEFAULT 'Unknown',
-            long_name   TEXT,
-            fetched_at  TEXT NOT NULL
+        CREATE TABLE IF NOT EXISTS known_instruments (
+            base_ticker   TEXT PRIMARY KEY,
+            name          TEXT NOT NULL,
+            type          TEXT NOT NULL DEFAULT 'Unknown',
+            market        TEXT,
+            sector        TEXT,
+            industry      TEXT,
+            index_tracked TEXT,
+            updated_at    TEXT NOT NULL
         );
     `);
     return _db;
@@ -132,55 +134,71 @@ export function saveCashFlows(rows: CashFlow[]): void {
     insertMany(rows);
 }
 
-export interface StockMetadata {
-    ticker: string;
+export interface KnownInstrument {
+    baseTicker: string;
+    name: string;
+    type: 'ETF' | 'Stock' | 'Bond' | 'Unknown';
+    market: string | null;
     sector: string | null;
     industry: string | null;
-    assetType: 'ETF' | 'Stock' | 'Unknown';
-    longName: string | null;
-    fetchedAt: string;
+    indexTracked: string | null;
 }
 
-export interface StockMetadataRow {
-    ticker: string;
-    sector: string | null;
-    industry: string | null;
-    asset_type: 'ETF' | 'Stock' | 'Unknown';
-    long_name: string | null;
-    fetched_at: string;
+export function t212ToBase(ticker: string): string {
+    return ticker.split('_')[0].replace(/[a-z]+$/, '');
 }
 
-export function upsertStockMetadata(rows: StockMetadata[]): void {
+export function upsertKnownInstruments(rows: KnownInstrument[]): void {
     if (rows.length === 0) return;
-    const stmt = getDb().prepare(
-        `INSERT INTO stock_metadata (ticker, sector, industry, asset_type, long_name, fetched_at)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(ticker) DO UPDATE SET
-             sector     = excluded.sector,
-             industry   = excluded.industry,
-             asset_type = excluded.asset_type,
-             long_name  = excluded.long_name,
-             fetched_at = excluded.fetched_at`
-    );
-    const txn = getDb().transaction((items: StockMetadata[]) => {
+    const stmt = getDb().prepare(`
+        INSERT INTO known_instruments
+            (base_ticker, name, type, market, sector, industry, index_tracked, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(base_ticker) DO UPDATE SET
+            name          = excluded.name,
+            type          = excluded.type,
+            market        = excluded.market,
+            sector        = excluded.sector,
+            industry      = excluded.industry,
+            index_tracked = excluded.index_tracked,
+            updated_at    = excluded.updated_at
+    `);
+    const txn = getDb().transaction((items: KnownInstrument[]) => {
+        const now = new Date().toISOString();
         for (const r of items) {
-            stmt.run(r.ticker, r.sector, r.industry, r.assetType, r.longName, r.fetchedAt);
+            stmt.run(
+                r.baseTicker,
+                r.name,
+                r.type,
+                r.market,
+                r.sector,
+                r.industry,
+                r.indexTracked,
+                now
+            );
         }
     });
     txn(rows);
 }
 
-export function loadStockMetadata(tickers: string[]): Map<string, StockMetadataRow> {
-    const out = new Map<string, StockMetadataRow>();
-    if (tickers.length === 0) return out;
-    const placeholders = tickers.map(() => '?').join(',');
+export function loadKnownInstruments(baseTickers: string[]): Map<string, KnownInstrument> {
+    const out = new Map<string, KnownInstrument>();
+    if (baseTickers.length === 0) return out;
+    const ph = baseTickers.map(() => '?').join(',');
     const rows = getDb()
-        .prepare(
-            `SELECT ticker, sector, industry, asset_type, long_name, fetched_at
-             FROM stock_metadata WHERE ticker IN (${placeholders})`
-        )
-        .all(...tickers) as StockMetadataRow[];
-    for (const r of rows) out.set(r.ticker, r);
+        .prepare(`SELECT * FROM known_instruments WHERE base_ticker IN (${ph})`)
+        .all(...baseTickers) as any[];
+    for (const r of rows) {
+        out.set(r.base_ticker, {
+            baseTicker: r.base_ticker,
+            name: r.name,
+            type: r.type,
+            market: r.market,
+            sector: r.sector,
+            industry: r.industry,
+            indexTracked: r.index_tracked
+        });
+    }
     return out;
 }
 

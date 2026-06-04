@@ -1,9 +1,6 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// We test the aggregation logic directly with an in-memory SQLite database,
-// bypassing the module singleton so each test starts from a clean state.
-
 let db: Database.Database;
 
 function setupSchema(d: Database.Database) {
@@ -17,65 +14,83 @@ function setupSchema(d: Database.Database) {
             currency    TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS stock_metadata (
-            ticker      TEXT PRIMARY KEY,
-            sector      TEXT,
-            industry    TEXT,
-            asset_type  TEXT NOT NULL DEFAULT 'Unknown',
-            long_name   TEXT,
-            fetched_at  TEXT NOT NULL
+        CREATE TABLE IF NOT EXISTS known_instruments (
+            base_ticker   TEXT PRIMARY KEY,
+            name          TEXT NOT NULL,
+            type          TEXT NOT NULL DEFAULT 'Unknown',
+            market        TEXT,
+            sector        TEXT,
+            industry      TEXT,
+            index_tracked TEXT,
+            updated_at    TEXT NOT NULL
         );
     `);
 }
 
-interface StockMetadataInput {
-    ticker: string;
+interface KnownInstrumentInput {
+    baseTicker: string;
+    name: string;
+    type: 'ETF' | 'Stock' | 'Bond' | 'Unknown';
+    market: string | null;
     sector: string | null;
     industry: string | null;
-    assetType: 'ETF' | 'Stock' | 'Unknown';
-    longName: string | null;
-    fetchedAt: string;
+    indexTracked: string | null;
 }
 
-interface StockMetadataDbRow {
-    ticker: string;
+interface KnownInstrumentRow {
+    base_ticker: string;
+    name: string;
+    type: string;
+    market: string | null;
     sector: string | null;
     industry: string | null;
-    asset_type: 'ETF' | 'Stock' | 'Unknown';
-    long_name: string | null;
-    fetched_at: string;
+    index_tracked: string | null;
+    updated_at: string;
 }
 
-function upsertMetadata(d: Database.Database, rows: StockMetadataInput[]) {
-    const stmt = d.prepare(
-        `INSERT INTO stock_metadata (ticker, sector, industry, asset_type, long_name, fetched_at)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(ticker) DO UPDATE SET
-             sector     = excluded.sector,
-             industry   = excluded.industry,
-             asset_type = excluded.asset_type,
-             long_name  = excluded.long_name,
-             fetched_at = excluded.fetched_at`
-    );
-    const txn = d.transaction((items: StockMetadataInput[]) => {
+function upsertInstruments(d: Database.Database, rows: KnownInstrumentInput[]) {
+    const stmt = d.prepare(`
+        INSERT INTO known_instruments
+            (base_ticker, name, type, market, sector, industry, index_tracked, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(base_ticker) DO UPDATE SET
+            name          = excluded.name,
+            type          = excluded.type,
+            market        = excluded.market,
+            sector        = excluded.sector,
+            industry      = excluded.industry,
+            index_tracked = excluded.index_tracked,
+            updated_at    = excluded.updated_at
+    `);
+    const txn = d.transaction((items: KnownInstrumentInput[]) => {
+        const now = new Date().toISOString();
         for (const r of items) {
-            stmt.run(r.ticker, r.sector, r.industry, r.assetType, r.longName, r.fetchedAt);
+            stmt.run(
+                r.baseTicker,
+                r.name,
+                r.type,
+                r.market,
+                r.sector,
+                r.industry,
+                r.indexTracked,
+                now
+            );
         }
     });
     txn(rows);
 }
 
-function loadMetadata(d: Database.Database, tickers: string[]): Map<string, StockMetadataDbRow> {
-    const out = new Map<string, StockMetadataDbRow>();
-    if (tickers.length === 0) return out;
-    const placeholders = tickers.map(() => '?').join(',');
+function loadInstruments(
+    d: Database.Database,
+    baseTickers: string[]
+): Map<string, KnownInstrumentRow> {
+    const out = new Map<string, KnownInstrumentRow>();
+    if (baseTickers.length === 0) return out;
+    const ph = baseTickers.map(() => '?').join(',');
     const rows = d
-        .prepare(
-            `SELECT ticker, sector, industry, asset_type, long_name, fetched_at
-             FROM stock_metadata WHERE ticker IN (${placeholders})`
-        )
-        .all(...tickers) as StockMetadataDbRow[];
-    for (const r of rows) out.set(r.ticker, r);
+        .prepare(`SELECT * FROM known_instruments WHERE base_ticker IN (${ph})`)
+        .all(...baseTickers) as KnownInstrumentRow[];
+    for (const r of rows) out.set(r.base_ticker, r);
     return out;
 }
 
@@ -138,78 +153,70 @@ describe('net contributed capital aggregation', () => {
 
     it('is idempotent for duplicate IDs (INSERT OR IGNORE)', () => {
         insertFlow(db, 'd1', 'DEPOSIT', 1000);
-        insertFlow(db, 'd1', 'DEPOSIT', 1000); // duplicate — should be ignored
+        insertFlow(db, 'd1', 'DEPOSIT', 1000);
         expect(netPln(db)).toBe(1000);
     });
 });
 
-describe('stock_metadata upsert/load', () => {
+describe('known_instruments upsert/load', () => {
     it('inserts and reads back multiple rows', () => {
-        upsertMetadata(db, [
+        upsertInstruments(db, [
             {
-                ticker: 'AAPL_US_EQ',
-                sector: 'Technology',
-                industry: 'Consumer Electronics',
-                assetType: 'Stock',
-                longName: 'Apple Inc.',
-                fetchedAt: '2026-06-04T08:00:00.000Z'
+                baseTicker: 'VWCE',
+                name: 'Vanguard FTSE All-World Acc',
+                type: 'ETF',
+                market: 'Xetra',
+                sector: 'Diversified',
+                industry: 'Diversified — all sectors',
+                indexTracked: 'FTSE All-World'
             },
             {
-                ticker: 'VWCE_GY_ETF',
+                baseTicker: 'BRKS',
+                name: 'Azenta Inc',
+                type: 'Stock',
+                market: 'NASDAQ',
+                sector: 'Healthcare',
+                industry: 'Semiconductor Equipment',
+                indexTracked: 'NASDAQ Composite'
+            }
+        ]);
+        const out = loadInstruments(db, ['VWCE', 'BRKS']);
+        expect(out.size).toBe(2);
+        expect(out.get('VWCE')?.type).toBe('ETF');
+        expect(out.get('VWCE')?.index_tracked).toBe('FTSE All-World');
+        expect(out.get('BRKS')?.sector).toBe('Healthcare');
+    });
+
+    it('upserts update existing rows', () => {
+        upsertInstruments(db, [
+            {
+                baseTicker: 'AGGH',
+                name: 'Old Name',
+                type: 'ETF',
+                market: 'LSE',
                 sector: null,
                 industry: null,
-                assetType: 'ETF',
-                longName: 'Vanguard FTSE All-World UCITS Acc',
-                fetchedAt: '2026-06-04T08:00:00.000Z'
+                indexTracked: null
             }
         ]);
-        const out = loadMetadata(db, ['AAPL_US_EQ', 'VWCE_GY_ETF']);
-        expect(out.size).toBe(2);
-        expect(out.get('AAPL_US_EQ')?.sector).toBe('Technology');
-        expect(out.get('VWCE_GY_ETF')?.asset_type).toBe('ETF');
-        expect(out.get('VWCE_GY_ETF')?.sector).toBeNull();
+        upsertInstruments(db, [
+            {
+                baseTicker: 'AGGH',
+                name: 'iShares Global Aggregate Bond EUR-Hedged Acc',
+                type: 'Bond',
+                market: 'LSE',
+                sector: 'Fixed Income',
+                industry: 'Fixed Income — Govt + Corp',
+                indexTracked: 'Bloomberg Global Aggregate (EUR-hedged)'
+            }
+        ]);
+        const out = loadInstruments(db, ['AGGH']);
+        expect(out.get('AGGH')?.type).toBe('Bond');
+        expect(out.get('AGGH')?.name).toBe('iShares Global Aggregate Bond EUR-Hedged Acc');
     });
 
-    it('preserves rows for tickers not in the upsert payload (FR-004)', () => {
-        upsertMetadata(db, [
-            {
-                ticker: 'AAPL_US_EQ',
-                sector: 'Technology',
-                industry: 'Consumer Electronics',
-                assetType: 'Stock',
-                longName: 'Apple Inc.',
-                fetchedAt: '2026-06-04T08:00:00.000Z'
-            },
-            {
-                ticker: 'MSFT_US_EQ',
-                sector: 'Technology',
-                industry: 'Software—Infrastructure',
-                assetType: 'Stock',
-                longName: 'Microsoft Corp',
-                fetchedAt: '2026-06-04T08:00:00.000Z'
-            }
-        ]);
-        // Simulate a later sync where only AAPL gets refreshed (e.g. MSFT failed at Yahoo).
-        upsertMetadata(db, [
-            {
-                ticker: 'AAPL_US_EQ',
-                sector: 'Technology',
-                industry: 'Consumer Electronics',
-                assetType: 'Stock',
-                longName: 'Apple Inc.',
-                fetchedAt: '2026-06-04T09:00:00.000Z'
-            }
-        ]);
-        const out = loadMetadata(db, ['AAPL_US_EQ', 'MSFT_US_EQ']);
-        expect(out.get('AAPL_US_EQ')?.fetched_at).toBe('2026-06-04T09:00:00.000Z');
-        // MSFT row MUST remain at its original fetched_at — failure did not erase it.
-        expect(out.get('MSFT_US_EQ')?.fetched_at).toBe('2026-06-04T08:00:00.000Z');
-        expect(out.get('MSFT_US_EQ')?.sector).toBe('Technology');
-    });
-
-    it('returns empty map for never-inserted tickers (caller defaults to Unknown)', () => {
-        const out = loadMetadata(db, ['GHOST_US_EQ']);
+    it('returns empty map for unknown base tickers', () => {
+        const out = loadInstruments(db, ['GHOST']);
         expect(out.size).toBe(0);
-        expect(out.get('GHOST_US_EQ')).toBeUndefined();
     });
 });

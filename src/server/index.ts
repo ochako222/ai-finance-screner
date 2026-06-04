@@ -6,8 +6,8 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import open from 'open';
 import { loadConfig } from './config.js';
-import { getDb } from './database.js';
-import { analyzeRoutes } from './routes/analyze.js';
+import { KNOWN_INSTRUMENTS } from './data/known-instruments.js';
+import { getDb, upsertKnownInstruments } from './database.js';
 import { portfolioRoutes } from './routes/portfolio.js';
 import { syncRoutes } from './routes/sync.js';
 
@@ -24,12 +24,12 @@ if (config.trading212.api_key.startsWith('your-')) {
 const fastify = Fastify({ logger: { level: 'info' } });
 
 getDb();
+upsertKnownInstruments(KNOWN_INSTRUMENTS);
 
 await fastify.register(fastifyCors, { origin: 'http://localhost:5173' });
 
 await fastify.register(portfolioRoutes);
 await fastify.register(syncRoutes);
-await fastify.register(analyzeRoutes);
 
 const distPath = resolve(__dirname, '../../dist/client');
 if (existsSync(distPath)) {

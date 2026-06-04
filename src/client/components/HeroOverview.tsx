@@ -17,14 +17,13 @@ function fmtSigned(n: number) {
 }
 
 export default function HeroOverview({ data }: Props) {
-    const { trading212: t212, capturedAt } = data;
+    const { trading212: t212, capturedAt, investedPln, pnlPln } = data;
     const { summary } = t212;
 
-    // deposited = cost basis + free cash = total account value at cost (no unrealised gains)
-    const deposited = summary.total - summary.result;
+    const deposited = investedPln;
     const flowPct = deposited > 0 ? (summary.total / deposited) * 100 : 100;
     const inMarket = summary.total - summary.cash;
-    const pnlPct = deposited > 0 ? (summary.result / deposited) * 100 : 0;
+    const pnlPct = deposited > 0 ? (pnlPln / deposited) * 100 : 0;
 
     const isStale = Date.now() - new Date(capturedAt).getTime() > 24 * 60 * 60 * 1000;
 
@@ -87,12 +86,12 @@ export default function HeroOverview({ data }: Props) {
                 {/* Column 3: Total P&L */}
                 <div className="hero__col">
                     <div className="label">Total P&amp;L</div>
-                    <div className={`hero__big ${summary.result >= 0 ? 'pos' : 'neg'}`}>
-                        {fmtSigned(summary.result)} zł
+                    <div className={`hero__big ${pnlPln >= 0 ? 'pos' : 'neg'}`}>
+                        {fmtSigned(pnlPln)} zł
                     </div>
-                    <div className="hero__sub-label">unrealised</div>
-                    <div className={`chip ${summary.result >= 0 ? 'chip--pos' : 'chip--neg'}`}>
-                        <span>{summary.result >= 0 ? '▲' : '▼'}</span> {fmtSigned(pnlPct)} %
+                    <div className="hero__sub-label">realised + unrealised</div>
+                    <div className={`chip ${pnlPln >= 0 ? 'chip--pos' : 'chip--neg'}`}>
+                        <span>{pnlPln >= 0 ? '▲' : '▼'}</span> {fmtSigned(pnlPct)} %
                     </div>
                 </div>
             </div>

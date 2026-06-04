@@ -1,4 +1,4 @@
-import type { AllocationBucket, AnalysisResult, PortfolioSnapshot } from '../support/types';
+import type { PortfolioSnapshot } from '../support/types';
 
 // Donut geometry: r=70, circumference=2πr
 const R = 70;
@@ -18,21 +18,9 @@ const POSITION_COLORS = [
 const ASSET_TYPE_COLORS: Record<string, string> = {
     Stock: '#89b4fa',
     ETF: '#94e2d5',
+    Bond: '#f9e2af',
     Unknown: '#6c7086'
 };
-
-const SECTOR_COLORS = [
-    '#89b4fa',
-    '#a6e3a1',
-    '#f9e2af',
-    '#eba0ac',
-    '#fab387',
-    '#74c7ec',
-    '#94e2d5',
-    '#cba6f7'
-];
-
-const SECTOR_TOP_N = 6;
 
 interface Segment {
     dashLen: number;
@@ -54,34 +42,6 @@ function buildSegments(values: number[], colors: string[]): Segment[] {
         angle += pct * 360;
         return seg;
     });
-}
-
-function bucketsToSegments(
-    buckets: AllocationBucket[],
-    colorFor: (b: AllocationBucket, i: number) => string
-): Segment[] {
-    const total = buckets.reduce((s, b) => s + b.weight_pct, 0);
-    if (total === 0) return [];
-    let angle = 0;
-    return buckets.map((b, i) => {
-        const pct = b.weight_pct / total;
-        const seg: Segment = {
-            dashLen: pct * CIRC,
-            startAngle: angle,
-            color: colorFor(b, i)
-        };
-        angle += pct * 360;
-        return seg;
-    });
-}
-
-function collapseSectors(buckets: AllocationBucket[]): AllocationBucket[] {
-    if (buckets.length <= SECTOR_TOP_N) return buckets;
-    const sorted = [...buckets].sort((a, b) => b.weight_pct - a.weight_pct);
-    const head = sorted.slice(0, SECTOR_TOP_N);
-    const tail = sorted.slice(SECTOR_TOP_N);
-    const other = tail.reduce((s, b) => s + b.weight_pct, 0);
-    return other > 0 ? [...head, { label: 'Other', weight_pct: other }] : head;
 }
 
 interface DonutProps {
@@ -120,10 +80,9 @@ function Donut({ segments, centerLabel, centerSub, trackColor = '#313244' }: Don
 
 interface Props {
     data: PortfolioSnapshot;
-    analysis?: AnalysisResult | null;
 }
 
-export default function AllocationChart({ data, analysis }: Props) {
+export default function AllocationChart({ data }: Props) {
     const positions = data.trading212.positions.filter((p) => p.value > 0);
 
     const posSegs = buildSegments(
@@ -131,45 +90,26 @@ export default function AllocationChart({ data, analysis }: Props) {
         POSITION_COLORS
     );
 
-    let assetTypeSegs: Segment[];
-    let assetTypeCenterLabel: string;
-    let assetTypeCenterSub: string;
+    const stockVal = positions
+        .filter((p) => !p.type || p.type === 'Stock')
+        .reduce((s, p) => s + p.value, 0);
+    const etfVal = positions.filter((p) => p.type === 'ETF').reduce((s, p) => s + p.value, 0);
+    const bondVal = positions.filter((p) => p.type === 'Bond').reduce((s, p) => s + p.value, 0);
+    const total = stockVal + etfVal + bondVal;
+    const stockPct = total > 0 ? Math.round((stockVal / total) * 100) : 100;
 
-    if (analysis?.allocation?.by_asset_type?.length) {
-        assetTypeSegs = bucketsToSegments(
-            analysis.allocation.by_asset_type,
-            (b) => ASSET_TYPE_COLORS[b.label] ?? '#6c7086'
-        );
-        const stockBucket = analysis.allocation.by_asset_type.find((b) => b.label === 'Stock');
-        const stockPct = stockBucket ? Math.round(stockBucket.weight_pct) : 0;
-        assetTypeCenterLabel = `${stockPct}%`;
-        assetTypeCenterSub = 'stocks';
-    } else {
-        const stockVal = positions
-            .filter((p) => !p.kind || p.kind === 'Stock')
-            .reduce((s, p) => s + p.value, 0);
-        const etfVal = positions.filter((p) => p.kind === 'ETF').reduce((s, p) => s + p.value, 0);
-        const total = stockVal + etfVal;
-        const stockPct = total > 0 ? Math.round((stockVal / total) * 100) : 100;
-        assetTypeSegs = buildSegments(
-            [stockVal, etfVal].filter((v) => v > 0),
-            [ASSET_TYPE_COLORS.Stock, ASSET_TYPE_COLORS.ETF]
-        );
-        if (assetTypeSegs.length === 0) {
-            assetTypeSegs = [{ dashLen: CIRC, startAngle: 0, color: ASSET_TYPE_COLORS.Stock }];
-        }
-        assetTypeCenterLabel = `${stockPct}%`;
-        assetTypeCenterSub = 'stocks';
+    const typeValues = [stockVal, etfVal, bondVal].filter((v) => v > 0);
+    const typeColors = [
+        ASSET_TYPE_COLORS.Stock,
+        ASSET_TYPE_COLORS.ETF,
+        ASSET_TYPE_COLORS.Bond
+    ].filter((_, i) => [stockVal, etfVal, bondVal][i] > 0);
+    let assetTypeSegs = buildSegments(typeValues, typeColors);
+    if (assetTypeSegs.length === 0) {
+        assetTypeSegs = [{ dashLen: CIRC, startAngle: 0, color: ASSET_TYPE_COLORS.Stock }];
     }
-
-    const sectorBuckets = analysis?.allocation?.by_sector
-        ? collapseSectors(analysis.allocation.by_sector)
-        : [];
-    const sectorSegs = bucketsToSegments(
-        sectorBuckets,
-        (_, i) => SECTOR_COLORS[i % SECTOR_COLORS.length]
-    );
-    const sectorCenterLabel = sectorBuckets.length > 0 ? String(sectorBuckets.length) : '—';
+    const assetTypeCenterLabel = `${stockPct}%`;
+    const assetTypeCenterSub = 'stocks';
 
     return (
         <section className="tile">
@@ -197,17 +137,6 @@ export default function AllocationChart({ data, analysis }: Props) {
                     />
                     <div className="alloc__cap">by instrument</div>
                 </div>
-
-                {sectorBuckets.length > 0 && (
-                    <div className="alloc__chart alloc__chart--div alloc__chart--sector">
-                        <Donut
-                            segments={sectorSegs}
-                            centerLabel={sectorCenterLabel}
-                            centerSub="sectors"
-                        />
-                        <div className="alloc__cap">by sector</div>
-                    </div>
-                )}
             </div>
         </section>
     );

@@ -1,3 +1,4 @@
+@use 'sass:list';
 @use 'variables' as *;
 
 // ── Layout ──────────────────────────────────────────────────────────────
@@ -387,7 +388,7 @@ $_dot-colors: ($blue, $green, $yellow, $maroon, $peach, $sapphire, $teal, $mauve
         flex-shrink: 0;
 
         @for $i from 0 through 7 {
-            &--#{$i} { background: nth($_dot-colors, $i + 1); }
+            &--#{$i} { background: list.nth($_dot-colors, $i + 1); }
         }
     }
 
@@ -427,8 +428,10 @@ $_dot-colors: ($blue, $green, $yellow, $maroon, $peach, $sapphire, $teal, $mauve
     border: 1px solid $surface1;
     white-space: nowrap;
 
-    &--etf   { color: $teal;     border-color: color-mix(in oklab, #{$teal}     40%, transparent); }
-    &--stock { color: $lavender; border-color: color-mix(in oklab, #{$lavender} 40%, transparent); }
+    &--etf     { color: $teal;    border-color: color-mix(in oklab, #{$teal}    40%, transparent); }
+    &--stock   { color: $lavender; border-color: color-mix(in oklab, #{$lavender} 40%, transparent); }
+    &--bond    { color: $yellow;  border-color: color-mix(in oklab, #{$yellow}  40%, transparent); }
+    &--unknown { color: $overlay1; border-color: color-mix(in oklab, #{$overlay1} 40%, transparent); }
 }
 
 // ── Crypto stub ───────────────────────────────────────────────────────────────

@@ -1,40 +1,36 @@
 import type { T212Position } from '../connectors/trading212.js';
-import type { StockMetadataRow } from '../database.js';
+import { type KnownInstrument, t212ToBase } from '../database.js';
 
-export interface EnrichedPosition {
-    ticker: string;
-    long_name: string | null;
-    quantity: number;
-    average_price: number;
-    current_price: number;
-    value: number;
-    ppl: number;
-    pnl_pct: number;
+export interface EnrichedPosition extends T212Position {
+    baseTicker: string;
+    name: string | null;
+    type: 'ETF' | 'Stock' | 'Bond' | 'Unknown';
+    market: string | null;
     sector: string | null;
     industry: string | null;
-    asset_type: 'ETF' | 'Stock' | 'Unknown';
+    indexTracked: string | null;
+    pnl_pct: number;
 }
 
 export function mergePositionsWithMetadata(
     positions: T212Position[],
-    byTicker: Map<string, StockMetadataRow>
+    byBase: Map<string, KnownInstrument>
 ): EnrichedPosition[] {
     return positions.map((p) => {
-        const meta = byTicker.get(p.ticker);
+        const base = t212ToBase(p.ticker);
+        const meta = byBase.get(base);
         const denom = p.averagePrice * p.quantity;
-        const pnlPct = denom === 0 ? 0 : (p.ppl / denom) * 100;
+        const pnl_pct = denom === 0 ? 0 : (p.ppl / denom) * 100;
         return {
-            ticker: p.ticker,
-            long_name: meta?.long_name ?? null,
-            quantity: p.quantity,
-            average_price: p.averagePrice,
-            current_price: p.currentPrice,
-            value: p.value,
-            ppl: p.ppl,
-            pnl_pct: pnlPct,
+            ...p,
+            baseTicker: base,
+            name: meta?.name ?? null,
+            type: meta?.type ?? 'Unknown',
+            market: meta?.market ?? null,
             sector: meta?.sector ?? null,
             industry: meta?.industry ?? null,
-            asset_type: meta?.asset_type ?? 'Unknown'
+            indexTracked: meta?.indexTracked ?? null,
+            pnl_pct
         };
     });
 }

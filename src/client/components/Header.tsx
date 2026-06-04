@@ -1,11 +1,10 @@
 interface HeaderProps {
     exchangeRate: number | null;
     onSync: () => void;
-    onAdvise: () => void;
     isSyncing: boolean;
 }
 
-export default function Header({ exchangeRate, onSync, onAdvise, isSyncing }: HeaderProps) {
+export default function Header({ exchangeRate, onSync, isSyncing }: HeaderProps) {
     return (
         <header className="bar">
             <div className="bar__group">
@@ -31,9 +30,6 @@ export default function Header({ exchangeRate, onSync, onAdvise, isSyncing }: He
                 <button type="button" className="btn" onClick={onSync} disabled={isSyncing}>
                     <span>⟳</span>
                     {isSyncing ? 'Syncing…' : 'Synchronize'}
-                </button>
-                <button type="button" className="btn btn--primary" onClick={onAdvise}>
-                    <span>✦</span>Advise
                 </button>
             </div>
         </header>
