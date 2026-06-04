@@ -353,18 +353,9 @@ body {
         text-transform: uppercase;
         color: $overlay1;
         border-bottom: 1px solid $surface0;
-        cursor: pointer;
-        user-select: none;
         white-space: nowrap;
 
         &.th-left { text-align: left; }
-
-        .arr { color: $surface2; margin-left: 5px; font-size: 9px; }
-
-        &[data-active="true"] {
-            color: $text;
-            .arr { color: $mauve; }
-        }
     }
 
     tbody td {
@@ -382,6 +373,8 @@ body {
     tbody tr:last-child td { border-bottom: none; }
 }
 
+$_dot-colors: ($blue, $green, $yellow, $maroon, $peach, $sapphire, $teal, $mauve);
+
 .ticker-cell {
     display: flex;
     align-items: center;
@@ -392,6 +385,10 @@ body {
         height: 11px;
         border-radius: 3px;
         flex-shrink: 0;
+
+        @for $i from 0 through 7 {
+            &--#{$i} { background: nth($_dot-colors, $i + 1); }
+        }
     }
 
     &__name { font-weight: 700; letter-spacing: 0.02em; }
@@ -404,6 +401,19 @@ body {
     font-size: 10.5px;
     font-weight: 600;
     white-space: nowrap;
+    color: $overlay0;
+    background: color-mix(in oklab, #{$overlay0} 14%, transparent);
+
+    &[data-sector="Communication Services"] { color: $sapphire;  background: color-mix(in oklab, #{$sapphire}  14%, transparent); }
+    &[data-sector="Consumer Cyclical"]       { color: $peach;     background: color-mix(in oklab, #{$peach}     14%, transparent); }
+    &[data-sector="Healthcare"]              { color: $teal;      background: color-mix(in oklab, #{$teal}      14%, transparent); }
+    &[data-sector="Technology"]              { color: $blue;      background: color-mix(in oklab, #{$blue}      14%, transparent); }
+    &[data-sector="Industrials"]             { color: $yellow;    background: color-mix(in oklab, #{$yellow}    14%, transparent); }
+    &[data-sector="Financials"]              { color: $lavender;  background: color-mix(in oklab, #{$lavender}  14%, transparent); }
+    &[data-sector="Energy"]                  { color: $maroon;    background: color-mix(in oklab, #{$maroon}    14%, transparent); }
+    &[data-sector="Materials"]               { color: $green;     background: color-mix(in oklab, #{$green}     14%, transparent); }
+    &[data-sector="Real Estate"]             { color: $rosewater; background: color-mix(in oklab, #{$rosewater} 14%, transparent); }
+    &[data-sector="Utilities"]               { color: $sky;       background: color-mix(in oklab, #{$sky}       14%, transparent); }
 }
 
 .kindtag {
@@ -416,6 +426,9 @@ body {
     text-transform: uppercase;
     border: 1px solid $surface1;
     white-space: nowrap;
+
+    &--etf   { color: $teal;     border-color: color-mix(in oklab, #{$teal}     40%, transparent); }
+    &--stock { color: $lavender; border-color: color-mix(in oklab, #{$lavender} 40%, transparent); }
 }
 
 // ── Crypto stub ───────────────────────────────────────────────────────────────
